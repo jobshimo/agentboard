@@ -1,17 +1,8 @@
-/**
- * src/events/__tests__/insert.test.ts
- *
- * Verifies:
- *   - insertEvent appends a row to the events table
- *   - insertEvent rejects an unrecognised event type
- *   - insertEvent does NOT open its own transaction (caller's tx is used)
- *   - notifyWaiters and broadcastWs stubs are called without error
- */
-
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import Database from "better-sqlite3";
 import { runMigrations } from "../../db/migrate.js";
 import { insertEvent } from "../insert.js";
+import type { InsertedEvent } from "../insert.js";
 import type { EventType, EventOrigin } from "../types.js";
 
 type Db = InstanceType<typeof Database>;
@@ -99,5 +90,52 @@ describe("insertEvent", () => {
 
     const count = (db.prepare("SELECT COUNT(*) AS cnt FROM events").get() as { cnt: number }).cnt;
     expect(count).toBe(1);
+  });
+
+  it("invokes provided listeners with the inserted event", () => {
+    insertTask(db);
+    const received: InsertedEvent[] = [];
+
+    insertEvent(
+      db,
+      { taskId: "T-1", type: "comment_added", payload: { text: "hi" }, origin: "human" },
+      { listeners: [(e) => received.push(e)] },
+    );
+
+    expect(received).toHaveLength(1);
+    expect(received[0].id).toBeGreaterThan(0);
+    expect(received[0].type).toBe("comment_added");
+    expect(received[0].payload).toEqual({ text: "hi" });
+  });
+
+  it("does not throw when no listeners are provided", () => {
+    insertTask(db);
+    expect(() =>
+      insertEvent(db, {
+        taskId: "T-1",
+        type: "comment_added",
+        payload: {},
+        origin: "human",
+      }),
+    ).not.toThrow();
+  });
+
+  it("invokes multiple listeners in registration order", () => {
+    insertTask(db);
+    const calls: string[] = [];
+
+    insertEvent(
+      db,
+      { taskId: "T-1", type: "comment_added", payload: {}, origin: "human" },
+      {
+        listeners: [
+          () => calls.push("first"),
+          () => calls.push("second"),
+          () => calls.push("third"),
+        ],
+      },
+    );
+
+    expect(calls).toEqual(["first", "second", "third"]);
   });
 });
