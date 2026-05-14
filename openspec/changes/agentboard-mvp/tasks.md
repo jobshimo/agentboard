@@ -35,11 +35,11 @@ Slices are ordered by dependency. Sequential constraints noted per slice.
 
 | # | Task | Commit | Spec refs |
 |---|------|--------|-----------|
-| 2.1.1 | `src/db/connection.ts`: open `better-sqlite3` DB at `<cwd>/.agentboard/db.sqlite`; set `pragma journal_mode=WAL; pragma synchronous=NORMAL; pragma foreign_keys=ON`. Export `getDb()` singleton. | `feat(db): SQLite connection with WAL pragmas` | storage.md invariant 1, design §2.5, design §3 notes |
-| 2.1.2 | `src/db/migrations/0001_init.sql`: full schema — `tasks`, `subtasks`, `discussion_entries`, `events`, `agent_sessions`, `schema_migrations` tables with all CHECK constraints and indexes. Matches design §3 field-for-field. | `feat(db): initial schema migration (all tables)` | storage.md, domain-model.md, event-queue.md, design §3 |
-| 2.1.3 | `src/db/migrate.ts`: versioned, idempotent runner — reads `schema_migrations`, applies numbered SQL files in order, records each in a transaction. Called from server start and `agentboard init`. | `feat(db): idempotent migration runner` | storage.md, launcher.md (first-run), design §6.5 |
-| 2.1.4 | `src/domain/ids.ts`: `T-NN` task id generator + `s-NN` subtask id generator. Scoped to current DB max. | `feat(domain): T-NN / s-NN id generator` | domain-model.md §ID format, design §1 |
-| 2.1.5 | Tests: `src/db/__tests__/migrate.test.ts` — in-memory (`:memory:`) migration run is idempotent; all tables exist after two runs; schema_migrations has one row per migration file. | `test(db): migration idempotency` | design §2.11 (Vitest) |
+| 2.1.1 | [x] `src/db/connection.ts`: open `better-sqlite3` DB at `<cwd>/.agentboard/db.sqlite`; set `pragma journal_mode=WAL; pragma synchronous=NORMAL; pragma foreign_keys=ON`. Export `getDb()` singleton. | `feat(db): SQLite connection with WAL pragmas` | storage.md invariant 1, design §2.5, design §3 notes |
+| 2.1.2 | [x] `src/db/migrations/0001_init.sql`: full schema — `tasks`, `subtasks`, `discussion_entries`, `events`, `agent_sessions`, `schema_migrations` tables with all CHECK constraints and indexes. Matches design §3 field-for-field. | `feat(db): initial schema migration (all tables)` | storage.md, domain-model.md, event-queue.md, design §3 |
+| 2.1.3 | [x] `src/db/migrate.ts`: versioned, idempotent runner — reads `schema_migrations`, applies numbered SQL files in order, records each in a transaction. Called from server start and `agentboard init`. | `feat(db): idempotent migration runner` | storage.md, launcher.md (first-run), design §6.5 |
+| 2.1.4 | [x] `src/domain/ids.ts`: `T-NN` task id generator + `s-NN` subtask id generator. Scoped to current DB max. | `feat(domain): T-NN / s-NN id generator` | domain-model.md §ID format, design §1 |
+| 2.1.5 | [x] Tests: `src/db/__tests__/migrate.test.ts` — in-memory (`:memory:`) migration run is idempotent; all tables exist after two runs; schema_migrations has one row per migration file. | `test(db): migration idempotency` | design §2.11 (Vitest) |
 
 ---
 
