@@ -1,3 +1,14 @@
 .engram/
 .atl/
 agentboard/
+
+# Build output
+dist/
+node_modules/
+
+# Runtime data
+.agentboard/
+
+# Vite / web build
+src/web/dist/
+dist/web/

@@ -1,0 +1,47 @@
+{
+  "name": "@jobshimo/agentboard",
+  "version": "0.1.0",
+  "description": "Local-first agentboard: task tracking for AI agents via MCP",
+  "private": true,
+  "engines": {
+    "node": ">=20.11"
+  },
+  "type": "module",
+  "main": "dist/cli/index.js",
+  "bin": {
+    "agentboard": "dist/cli/index.js"
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json",
+    "build:web": "vite build --config src/web/vite.config.ts",
+    "dev:web": "vite dev --config src/web/vite.config.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run build && npm run build:web"
+  },
+  "dependencies": {
+    "@fastify/websocket": "^8.3.1",
+    "@modelcontextprotocol/sdk": "^1.10.2",
+    "better-sqlite3": "^11.6.0",
+    "fastify": "^4.28.1",
+    "js-yaml": "^4.1.0",
+    "pino": "^9.4.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^20.14.0",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitest/coverage-v8": "^2.1.1",
+    "jsdom": "^25.0.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-markdown": "^9.0.1",
+    "typescript": "^5.5.3",
+    "vite": "^5.4.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "vitest": "^2.1.1"
+  }
+}
