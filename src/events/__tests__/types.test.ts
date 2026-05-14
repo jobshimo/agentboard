@@ -1,12 +1,3 @@
-/**
- * src/events/__tests__/types.test.ts
- *
- * Verifies:
- *   - EVENT_TYPES contains exactly the 10 types from event-queue.md
- *   - isValidEventType accepts known types and rejects unknowns
- *   - EventOrigin covers human | agent | system
- */
-
 import { describe, it, expect } from "vitest";
 import {
   EVENT_TYPES,

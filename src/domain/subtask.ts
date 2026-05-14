@@ -1,18 +1,3 @@
-/**
- * src/domain/subtask.ts
- *
- * Six-state subtask machine as defined in domain-model.md.
- *
- * States: pending | in-progress | done | blocked | failed | skipped
- *
- * Terminal states: done, skipped — no outgoing transitions.
- * Non-terminal:    pending, in-progress, blocked, failed — can advance.
- *
- * The click-dot UX uses `advanceState` for the primary progression path.
- * Side transitions (blocked, failed, skipped) are set directly via status
- * writes — the right-click context menu bypasses advanceState.
- */
-
 export const SUBTASK_STATUSES = [
   "pending",
   "in-progress",
@@ -52,16 +37,6 @@ export function isTerminal(status: SubtaskStatus): boolean {
   return status === "done" || status === "skipped";
 }
 
-/**
- * Click-dot primary advance: returns the next state in the
- * forward progression path.
- *
- * pending       → in-progress
- * in-progress   → done
- * failed        → in-progress  (retry)
- * blocked       → in-progress  (unblocked)
- * done / skipped → unchanged   (no-op at terminal)
- */
 export function advanceState(current: SubtaskStatus): SubtaskStatus {
   const progressionMap: Record<SubtaskStatus, SubtaskStatus> = {
     pending: "in-progress",

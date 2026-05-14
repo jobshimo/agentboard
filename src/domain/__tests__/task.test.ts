@@ -1,12 +1,3 @@
-/**
- * src/domain/__tests__/task.test.ts
- *
- * Verifies:
- *   - createReferenced inserts a task row with the correct shape
- *   - createLocal inserts a task row with type "local"
- *   - derivedStatus formula for all boundary cases per domain-model.md
- */
-
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import Database from "better-sqlite3";
 import { runMigrations } from "../../db/migrate.js";

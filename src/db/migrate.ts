@@ -1,19 +1,3 @@
-/**
- * src/db/migrate.ts
- *
- * Versioned, idempotent migration runner for agentboard.
- *
- * Strategy:
- *   - Reads SQL files from src/db/migrations/ named `NNNN_*.sql`.
- *   - Checks schema_migrations for already-applied versions.
- *   - Applies each missing file in version order inside a transaction.
- *   - Records the applied version in schema_migrations within the same transaction.
- *
- * Called from:
- *   - db/connection.ts (on every server start)
- *   - cli/init.ts (agentboard init subcommand)
- */
-
 import { readFileSync, readdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -30,11 +14,6 @@ interface MigrationFile {
   path: string;
 }
 
-/**
- * Discover migration files in MIGRATIONS_DIR.
- * Expects filenames like `0001_init.sql`, `0002_add_column.sql`, etc.
- * Returns them sorted by version number ascending.
- */
 function discoverMigrations(): MigrationFile[] {
   const entries = readdirSync(MIGRATIONS_DIR);
   const migrations: MigrationFile[] = [];
@@ -50,11 +29,7 @@ function discoverMigrations(): MigrationFile[] {
   return migrations.sort((a, b) => a.version - b.version);
 }
 
-/**
- * Ensures the schema_migrations table exists.
- * Safe to call before the full schema is applied — it only touches
- * the bookkeeping table.
- */
+// Safe to call before the full schema is applied — only touches the bookkeeping table.
 function ensureMigrationsTable(db: InstanceType<typeof Database>): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -64,9 +39,6 @@ function ensureMigrationsTable(db: InstanceType<typeof Database>): void {
   `);
 }
 
-/**
- * Returns the set of already-applied migration versions.
- */
 function appliedVersions(db: InstanceType<typeof Database>): Set<number> {
   const rows = db
     .prepare("SELECT version FROM schema_migrations")
@@ -74,12 +46,6 @@ function appliedVersions(db: InstanceType<typeof Database>): Set<number> {
   return new Set(rows.map((r) => r.version));
 }
 
-/**
- * Runs all pending migrations against the given database connection.
- * Safe to call multiple times — already-applied migrations are skipped.
- *
- * @param db  An open better-sqlite3 Database instance.
- */
 export function runMigrations(db: InstanceType<typeof Database>): void {
   ensureMigrationsTable(db);
 

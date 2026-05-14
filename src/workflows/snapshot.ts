@@ -8,10 +8,6 @@ export class SnapshotRehydrationError extends Error {
   }
 }
 
-/**
- * Produces a deep-cloned, JSON-serializable snapshot of a Workflow.
- * The returned object is safe to pass to JSON.stringify() for DB storage.
- */
 export function freezeWorkflow(workflow: Workflow): WorkflowSnapshot {
   return {
     id: workflow.id,
@@ -28,11 +24,6 @@ export function freezeWorkflow(workflow: Workflow): WorkflowSnapshot {
   };
 }
 
-/**
- * Parses a JSON string back into a WorkflowSnapshot and validates
- * its core schema shape for backward integrity.
- * Throws SnapshotRehydrationError on any failure.
- */
 export function rehydrateSnapshot(json: string): WorkflowSnapshot {
   let parsed: unknown;
   try {

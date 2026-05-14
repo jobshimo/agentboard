@@ -1,14 +1,3 @@
-/**
- * src/db/connection.ts
- *
- * Opens the better-sqlite3 database at `<cwd>/.agentboard/db.sqlite`,
- * enables WAL mode and recommended pragmas, and applies all pending
- * migrations before returning.
- *
- * Exports a `getDb()` singleton so every module in the process shares
- * the same connection (required for WAL's single-writer guarantee).
- */
-
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import Database from "better-sqlite3";
@@ -30,20 +19,7 @@ function applyPragmas(db: Db): void {
   db.pragma("foreign_keys = ON");
 }
 
-/**
- * Returns the shared database singleton.
- *
- * On first call:
- *   1. Creates `.agentboard/` directory if needed.
- *   2. Opens (or creates) `.agentboard/db.sqlite`.
- *   3. Applies WAL pragmas.
- *   4. Runs any pending migrations.
- *
- * On subsequent calls: returns the already-open instance.
- *
- * @param cwd  Working directory for the repo (defaults to process.cwd()).
- *             Pass an explicit path in tests to keep databases isolated.
- */
+// Pass an explicit cwd in tests to keep databases isolated from each other.
 export function getDb(cwd: string = process.cwd()): Db {
   if (_db) return _db;
 
@@ -60,10 +36,6 @@ export function getDb(cwd: string = process.cwd()): Db {
   return _db;
 }
 
-/**
- * Closes the singleton and resets it.
- * Intended for use in tests and in graceful-shutdown handlers.
- */
 export function closeDb(): void {
   if (_db) {
     _db.close();

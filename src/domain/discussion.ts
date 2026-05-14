@@ -1,16 +1,3 @@
-/**
- * src/domain/discussion.ts
- *
- * Append-only discussion entries on a task.
- *
- * appendEntry: adds one entry; throws if the task does not exist.
- * getEntries:  returns entries ASC by id; returns a summary block
- *              when count exceeds 50 (per domain-model.md §discussion).
- *
- * The summary threshold is 50 to match the spec invariant:
- *   "if count > 50 returns a summary block"
- */
-
 import type Database from "better-sqlite3";
 
 type Db = InstanceType<typeof Database>;
@@ -56,17 +43,7 @@ export function appendEntry(
   `).run(taskId, author, body, tag ?? null);
 }
 
-/**
- * Retrieves discussion entries for a task in ascending order.
- *
- * When total count exceeds SUMMARY_THRESHOLD (50), returns a summary block
- * containing the count and a brief descriptor — the full entries are still
- * available via a paginated endpoint but are not returned here to avoid
- * bloating MCP tool responses (token-economy.md §discussion).
- *
- * @param limit  Optional cap on returned entries (default: all). Ignored
- *               when the result switches to summary mode.
- */
+// Returns summary mode (not full entries) above SUMMARY_THRESHOLD to avoid bloating MCP tool responses (token-economy.md §discussion).
 export function getEntries(
   db: Db,
   taskId: string,

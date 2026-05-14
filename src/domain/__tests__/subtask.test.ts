@@ -1,13 +1,3 @@
-/**
- * src/domain/__tests__/subtask.test.ts
- *
- * Verifies the six-state subtask machine:
- *   - SubtaskStatus union covers exactly the six allowed values
- *   - advanceState returns the next state in the click-dot UX flow
- *   - isTerminal identifies the three terminal states correctly
- *   - validTransitions enforces which transitions are legal
- */
-
 import { describe, it, expect } from "vitest";
 import {
   SUBTASK_STATUSES,

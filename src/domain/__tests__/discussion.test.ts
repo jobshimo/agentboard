@@ -1,13 +1,3 @@
-/**
- * src/domain/__tests__/discussion.test.ts
- *
- * Verifies:
- *   - appendEntry inserts a discussion entry for an existing task
- *   - appendEntry throws when the task does not exist
- *   - getEntries returns entries in ASC order
- *   - getEntries returns a summary block when count exceeds 50
- */
-
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import Database from "better-sqlite3";
 import { runMigrations } from "../../db/migrate.js";

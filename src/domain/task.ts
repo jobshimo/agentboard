@@ -1,17 +1,3 @@
-/**
- * src/domain/task.ts
- *
- * Task creation and derived-status computation.
- *
- * createReferenced / createLocal: insert into the tasks table and return
- * the newly minted id. The workflow_snapshot is accepted as a pre-serialised
- * JSON string so that S3 (snapshot freeze/rehydrate) can own the serialisation
- * boundary without touching this module.
- *
- * derivedStatus: pure formula — recomputed inside the same transaction as
- * any subtask write to keep tasks.derived_status consistent.
- */
-
 import type Database from "better-sqlite3";
 import { nextTaskId } from "./ids.js";
 import type { SubtaskStatus } from "./subtask.js";
@@ -28,7 +14,7 @@ export type DerivedStatus = "backlog" | "active" | "blocked" | "done";
 interface TaskCreateOpts {
   title: string;
   workflowId: string;
-  /** Pre-serialised JSON string (S3 will freeze the real snapshot) */
+  /** Pre-serialised JSON string — the freeze/rehydrate layer owns serialisation, not this module. */
   workflowSnapshot: string;
 }
 
@@ -45,10 +31,6 @@ interface ReferencedOpts extends TaskCreateOpts {
 // Factories
 // ---------------------------------------------------------------------------
 
-/**
- * Inserts a task originated from an external system (GitHub, Jira, Linear).
- * Returns the new task id.
- */
 export function createReferenced(db: Db, opts: ReferencedOpts): string {
   const id = nextTaskId(db);
 
@@ -74,10 +56,6 @@ export function createReferenced(db: Db, opts: ReferencedOpts): string {
   return id;
 }
 
-/**
- * Inserts a task created directly in agentboard, with no external reference.
- * Returns the new task id.
- */
 export function createLocal(db: Db, opts: TaskCreateOpts): string {
   const id = nextTaskId(db);
 

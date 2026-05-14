@@ -43,11 +43,6 @@ function rawToWorkflow(raw: WorkflowFileRaw): Workflow {
   return { id: raw.id, label: raw.label, steps };
 }
 
-/**
- * Reads a single YAML file, validates it, and returns a domain Workflow.
- * Throws WorkflowFileNotFoundError, WorkflowParseError, WorkflowValidationError,
- * or DuplicateStepIdError — all typed, all with human-readable messages.
- */
 export function loadWorkflowFile(filePath: string): Workflow {
   if (!fs.existsSync(filePath)) {
     throw new WorkflowFileNotFoundError(filePath);
