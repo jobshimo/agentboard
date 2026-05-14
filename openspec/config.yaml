@@ -1,0 +1,54 @@
+schema: spec-driven
+
+context: |
+  Tech stack: pre-implementation. Node + SQLite + Web UI planned; specific frameworks (backend, frontend, SQLite driver, MCP transport) deferred to sdd-design.
+  Architecture: local-first single-process server exposing Web UI + MCP + REST/WS. Storage canonical in SQLite; markdown is a derived view.
+  Source of truth: DESIGN.md at repo root. BRIEF-DESIGN.md scopes UI/CLI delegation to an external design agent.
+  Conventions: conventional commits; no Co-Authored-By trailers; voseo Rioplatense for Spanish UX copy.
+  Testing: no test runner installed yet.
+
+strict_tdd: false
+# NOTE: Strict TDD Mode unavailable — no test runner detected. Once package.json + a test framework
+# (vitest/jest/etc.) are installed, re-run sdd-init to detect capabilities and enable Strict TDD.
+
+testing:
+  test_runner: null
+  framework: null
+  layers:
+    unit: false
+    integration: false
+    e2e: false
+  coverage:
+    available: false
+    command: null
+  quality:
+    linter: null
+    type_checker: null
+    formatter: null
+  detected_on: "2026-05-14"
+
+rules:
+  proposal:
+    - Include rollback plan for risky changes
+    - Identify affected modules/packages
+  specs:
+    - Use Given/When/Then format for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+  design:
+    - Include sequence diagrams for complex flows
+    - Document architecture decisions with rationale
+    - Integrate UI deliverables from BRIEF-DESIGN.md when claude-design returns
+  tasks:
+    - Group tasks by phase (infrastructure, implementation, testing)
+    - Use hierarchical numbering (1.1, 1.2, etc.)
+    - Keep tasks small enough to complete in one session
+    - Honor the 400-line review budget — split into chained PRs when forecast is high
+  apply:
+    - Follow existing code patterns and conventions
+    - Load relevant coding skills from .atl/skill-registry.md
+    - Use work-unit commits, tests beside the code they verify
+  verify:
+    - Run tests if test infrastructure exists
+    - Compare implementation against every spec scenario
+  archive:
+    - Warn before merging destructive deltas (large removals)
