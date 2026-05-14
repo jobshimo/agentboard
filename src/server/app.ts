@@ -3,6 +3,7 @@ import type { FastifyInstance } from "fastify";
 import fastifyWebsocket from "@fastify/websocket";
 import type Database from "better-sqlite3";
 import { toHttpError } from "./errors.js";
+import { registerRestRoutes } from "./rest.js";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { join, dirname } from "node:path";
@@ -48,6 +49,8 @@ export function buildApp(opts: AppOpts): FastifyInstance {
       uptime_ms: Date.now() - startedAt,
     });
   });
+
+  registerRestRoutes(app, opts.db);
 
   return app;
 }
