@@ -11,13 +11,14 @@
   "bin": {
     "agentboard": "dist/cli/index.js"
   },
+  "packageManager": "pnpm@11.1.2",
   "scripts": {
     "build": "tsc --project tsconfig.build.json",
     "build:web": "vite build --config src/web/vite.config.ts",
     "dev:web": "vite dev --config src/web/vite.config.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "prepublishOnly": "npm run build && npm run build:web"
+    "prepublishOnly": "pnpm build && pnpm build:web"
   },
   "dependencies": {
     "@fastify/websocket": "^8.3.1",

@@ -13,14 +13,14 @@ strict_tdd: true
 testing:
   test_runner: vitest
   framework: vitest
-  command: "npm test"
+  command: "pnpm test"
   layers:
     unit: true
     integration: false   # no @testing-library/* yet; add when SPA tests need DOM assertions
     e2e: false            # no playwright/cypress yet
   coverage:
     available: true
-    command: "npm test -- --coverage"
+    command: "pnpm test --coverage"
   quality:
     linter: null          # eslint not installed
     type_checker: "tsc --noEmit -p tsconfig.json"
