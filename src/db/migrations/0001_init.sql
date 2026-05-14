@@ -76,9 +76,3 @@ CREATE TABLE agent_sessions (
   active        INTEGER NOT NULL DEFAULT 1              -- 0 once deactivate() called or zombie pruned
 );
 CREATE INDEX idx_sessions_lastseen ON agent_sessions (last_seen);
-
--- 3.6 schema_migrations (migration runner bookkeeping)
-CREATE TABLE schema_migrations (
-  version    INTEGER PRIMARY KEY,
-  applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
