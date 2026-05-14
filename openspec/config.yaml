@@ -1,31 +1,31 @@
 schema: spec-driven
 
 context: |
-  Tech stack: pre-implementation. Node + SQLite + Web UI planned; specific frameworks (backend, frontend, SQLite driver, MCP transport) deferred to sdd-design.
-  Architecture: local-first single-process server exposing Web UI + MCP + REST/WS. Storage canonical in SQLite; markdown is a derived view.
-  Source of truth: DESIGN.md at repo root. BRIEF-DESIGN.md scopes UI/CLI delegation to an external design agent.
+  Tech stack: Node 20.11+ (ESM) + Fastify 4 + better-sqlite3 11 + Zod + Pino + @modelcontextprotocol/sdk; SPA in Vite 5 + React 18 + react-markdown.
+  Architecture: local-first single-process server exposing Web UI + MCP (HTTP/SSE) + REST/WS on :7733. Hexagonal module layout under src/.
+  Source of truth: DESIGN.md at repo root. BRIEF-DESIGN.md scopes UI/CLI delegation. agentboard/ (gitignored) holds claude-design deliverables.
   Conventions: conventional commits; no Co-Authored-By trailers; voseo Rioplatense for Spanish UX copy.
-  Testing: no test runner installed yet.
+  Testing: vitest 2.1 + jsdom 25 + @vitest/coverage-v8.
 
-strict_tdd: false
-# NOTE: Strict TDD Mode unavailable — no test runner detected. Once package.json + a test framework
-# (vitest/jest/etc.) are installed, re-run sdd-init to detect capabilities and enable Strict TDD.
+strict_tdd: true
+# Strict TDD Mode active — test stack detected in package.json.
 
 testing:
-  test_runner: null
-  framework: null
+  test_runner: vitest
+  framework: vitest
+  command: "npm test"
   layers:
-    unit: false
-    integration: false
-    e2e: false
+    unit: true
+    integration: false   # no @testing-library/* yet; add when SPA tests need DOM assertions
+    e2e: false            # no playwright/cypress yet
   coverage:
-    available: false
-    command: null
+    available: true
+    command: "npm test -- --coverage"
   quality:
-    linter: null
-    type_checker: null
-    formatter: null
-  detected_on: "2026-05-14"
+    linter: null          # eslint not installed
+    type_checker: "tsc --noEmit -p tsconfig.json"
+    formatter: null       # prettier not installed
+  detected_on: "2026-05-15"
 
 rules:
   proposal:
