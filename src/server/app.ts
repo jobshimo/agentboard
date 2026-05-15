@@ -133,8 +133,9 @@ export function buildApp(opts: AppOpts): FastifyInstance & { broadcaster: Broadc
 
     // S3: upsert registry on cache miss (new repo seen for first time)
     // REQ-S-03 — debounced so rapid parallel requests don't hammer disk
+    // Pass repoParam as displayPath to preserve original casing on Win32 (#621).
     if (isNewRepo && opts.agbHome) {
-      debouncedUpsert(opts.agbHome, normalizedRepo);
+      debouncedUpsert(opts.agbHome, normalizedRepo, repoParam);
     }
   });
 

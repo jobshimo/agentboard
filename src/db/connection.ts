@@ -72,8 +72,6 @@ export function getDbForRepo(repoRoot: string): Db {
   applyPragmas(db);
   runMigrations(db);
 
-  // TODO: co-cache trigger materializer per repo alongside DB (v1 deferred,
-  // currently materializer is created per-request in buildApp; tracked in design §2 open Q1).
   dbCache.set(key, db);
   return db;
 }

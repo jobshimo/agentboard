@@ -21,6 +21,11 @@ export interface RepoEntry {
   path: string;
   /** ISO 8601 timestamp of when this repo was last seen by the daemon. */
   lastSeenAt: string;
+  /**
+   * Original path as typed/passed by the user — preserves casing on Win32.
+   * Falls back to `path` when not available (older entries).
+   */
+  displayPath?: string;
 }
 
 export interface Registry {
@@ -103,7 +108,7 @@ export function saveRegistry(agbHome: string, registry: Registry): void {
  *
  * REQ-S-03
  */
-export function upsertRepo(registry: Registry, repoPath: string): Registry {
+export function upsertRepo(registry: Registry, repoPath: string, displayPath?: string): Registry {
   const normalizedPath = normalizeRepoPath(repoPath);
   const now = new Date().toISOString();
 
@@ -113,11 +118,11 @@ export function upsertRepo(registry: Registry, repoPath: string): Registry {
   if (existing) {
     newRepos = registry.repos.map((r) =>
       normalizeRepoPath(r.path) === normalizedPath
-        ? { ...r, lastSeenAt: now }
+        ? { ...r, lastSeenAt: now, ...(displayPath ? { displayPath } : {}) }
         : r,
     );
   } else {
-    newRepos = [...registry.repos, { path: normalizedPath, lastSeenAt: now }];
+    newRepos = [...registry.repos, { path: normalizedPath, lastSeenAt: now, ...(displayPath ? { displayPath } : {}) }];
   }
 
   // Sort descending by lastSeenAt (most recent first)
@@ -146,13 +151,13 @@ const DEBOUNCE_MS = 500;
  *
  * REQ-S-03
  */
-export function debouncedUpsert(agbHome: string, repoPath: string): void {
+export function debouncedUpsert(agbHome: string, repoPath: string, displayPath?: string): void {
   // Load once (or use cached state)
   if (_cachedRegistry === null) {
     _cachedRegistry = loadRegistry(agbHome);
   }
 
-  _cachedRegistry = upsertRepo(_cachedRegistry, repoPath);
+  _cachedRegistry = upsertRepo(_cachedRegistry, repoPath, displayPath);
 
   if (_debounceTimer !== null) {
     clearTimeout(_debounceTimer);

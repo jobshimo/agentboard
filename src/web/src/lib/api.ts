@@ -200,6 +200,8 @@ export function fetchWorkflows(): Promise<WorkflowSummary[]> {
 export interface RepoEntry {
   path: string;
   lastSeenAt: string;
+  /** Original path as typed by the user — preserves casing on Win32. */
+  displayPath?: string;
 }
 
 export function fetchRepos(): Promise<{ repos: RepoEntry[] }> {

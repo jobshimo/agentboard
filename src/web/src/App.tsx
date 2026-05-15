@@ -17,6 +17,7 @@ import { dispatch } from "./lib/store";
 export function App() {
   const [theme, setTheme] = useState<Theme>(getPersistedTheme);
   const [topBarView, setTopBarView] = useState<ViewName>(deriveTopBarView());
+  const [displayPaths, setDisplayPaths] = useState<Record<string, string>>({});
   const tasks = useTasks();
   const workflowFilter = useWorkflowFilter();
   const activeRepo = useActiveRepo();
@@ -34,6 +35,12 @@ export function App() {
     fetchRepos()
       .then(({ repos }) => {
         dispatch({ type: "SET_AVAILABLE_REPOS", availableRepos: repos.map((r) => r.path) });
+        // Build displayPath map for TopBar (preserves user's original casing on Win32 — #621)
+        const dpMap: Record<string, string> = {};
+        for (const r of repos) {
+          if (r.displayPath) dpMap[r.path] = r.displayPath;
+        }
+        if (Object.keys(dpMap).length > 0) setDisplayPaths(dpMap);
         // Pick from localStorage (already in state) or default to first repo
         const stored = localStorage.getItem("agentboard.activeRepo");
         const pick = (stored && repos.some((r) => r.path === stored))
@@ -116,6 +123,7 @@ export function App() {
           availableRepos={availableRepos}
           activeRepo={activeRepo}
           onSwitchRepo={handleSwitchRepo}
+          displayPaths={displayPaths}
         />
         <div className="ab-main">
           <Sidebar

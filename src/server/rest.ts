@@ -21,7 +21,7 @@ import {
   canStartSubtask,
   type SubtaskRow,
 } from "../domain/subtask.js";
-import { insertEvent, type InsertEventHooks } from "../events/insert.js";
+import { insertEvent, type InsertEventHooks, type EventListener } from "../events/insert.js";
 import type { BroadcastManager } from "./broadcaster.js";
 import type { WaiterRegistry } from "../events/wait.js";
 import { createTriggerMaterializer } from "../events/triggered-materializer.js";
@@ -159,12 +159,17 @@ const AddFeedbackBody = z.object({
 // All handlers read req.db and req.repoRoot (injected by the onRequest hook).
 // ---------------------------------------------------------------------------
 
+// Per-repo trigger materializer cache — avoids creating a new closure per request.
+// Keyed by normalized repo root (same key as getDbForRepo).
+const materializerCache = new Map<string, EventListener>();
+
 function buildHooks(app: FastifyInstance, broadcaster: BroadcastManager, waiters: WaiterRegistry): (req: { db: InstanceType<typeof import("better-sqlite3")>; repoRoot: string }) => InsertEventHooks {
   return (req) => {
-    // Per-request materializer: created each time for now.
-    // TODO: co-cache materializer per repo alongside getDbForRepo (v1 deferred,
-    // see design §2 open Q1 and tasks.md S1 note).
-    const triggerMaterializer = createTriggerMaterializer(req.db);
+    let triggerMaterializer = materializerCache.get(req.repoRoot);
+    if (!triggerMaterializer) {
+      triggerMaterializer = createTriggerMaterializer(req.db);
+      materializerCache.set(req.repoRoot, triggerMaterializer);
+    }
     return {
       listeners: [broadcaster.listener, waiters.listener, triggerMaterializer],
     };

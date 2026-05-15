@@ -22,9 +22,11 @@ interface TopBarProps {
   activeRepo: string | null;
   /** S7: called when the user selects a different repo */
   onSwitchRepo: (repo: string) => void;
+  /** #621: map from normalized path → original display path (preserves Win32 casing) */
+  displayPaths?: Record<string, string>;
 }
 
-export function TopBar({ view, onSetView, theme, onToggleTheme, availableRepos, activeRepo, onSwitchRepo }: TopBarProps) {
+export function TopBar({ view, onSetView, theme, onToggleTheme, availableRepos, activeRepo, onSwitchRepo, displayPaths }: TopBarProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const repoLabel = activeRepo != null ? basename(activeRepo) : en.repo_none;
 
@@ -67,7 +69,7 @@ export function TopBar({ view, onSetView, theme, onToggleTheme, availableRepos, 
                 }}
               >
                 <span className="repo-basename">{basename(repo)}</span>
-                <span className="repo-full muted">{repo}</span>
+                <span className="repo-full muted">{(displayPaths && displayPaths[repo]) ?? repo}</span>
               </li>
             ))}
           </ul>

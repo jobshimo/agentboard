@@ -12,7 +12,7 @@ import { runStop } from "./stop.js";
 import { runStatus } from "./status.js";
 import { getVersion } from "./version.js";
 import { printLine, printError, printHelp } from "./output.js";
-import { getDb } from "../db/connection.js";
+import { getDbForRepo } from "../db/connection.js";
 import { probeForExistingDaemon } from "./spawn-daemon.js";
 
 interface ParsedArgs {
@@ -140,7 +140,7 @@ async function main(): Promise<void> {
         printError("  $ agentboard init                # create one");
         process.exit(1);
       }
-      const db = getDb(cwd);
+      const db = getDbForRepo(cwd);
       runExport(db, cwd);
       process.exit(0);
     }
