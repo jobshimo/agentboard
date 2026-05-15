@@ -29,8 +29,9 @@ export function printBanner(opts: {
   port: number;
   cwd: string;
   firstRun: boolean;
+  webBundlePresent: boolean;
 }): void {
-  const { version, port, cwd } = opts;
+  const { version, port, cwd, webBundlePresent } = opts;
   const repoName = cwd.split(/[\\/]/).at(-1) ?? cwd;
   const dbPath = ".agentboard/db.sqlite";
 
@@ -56,7 +57,11 @@ export function printBanner(opts: {
     printLine("");
   }
 
-  printLine(`${c.green}✓${c.reset} ${c.dim}web ui     ${c.reset} ${c.cyan}http://localhost:${port}${c.reset}`);
+  if (webBundlePresent) {
+    printLine(`${c.green}✓${c.reset} ${c.dim}web ui     ${c.reset} ${c.cyan}http://localhost:${port}${c.reset}`);
+  } else {
+    printLine(`${c.yellow}!${c.reset} ${c.dim}web ui     ${c.reset} ${c.dim}no dist/web/ bundle — run ${c.reset}${c.bold}pnpm dev:web${c.reset}${c.dim} (Vite on :5173)${c.reset}`);
+  }
   printLine(`${c.green}✓${c.reset} ${c.dim}mcp        ${c.reset} ${c.cyan}http://localhost:${port}/mcp${c.reset}`);
   printLine(`${c.green}✓${c.reset} ${c.dim}websocket  ${c.reset} ${c.cyan}ws://localhost:${port}/ws${c.reset}`);
   printLine("");

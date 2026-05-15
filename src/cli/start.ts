@@ -79,16 +79,24 @@ export async function runStart(opts: StartOpts): Promise<void> {
 
   await app.listen({ port: resolvedPort, host: "127.0.0.1" });
 
+  const webBundlePath = join(cwd, "dist", "web", "index.html");
+  const webBundlePresent = existsSync(webBundlePath);
+
   printBanner({
     version: getVersion(),
     port: resolvedPort,
     cwd,
     firstRun,
+    webBundlePresent,
   });
 
-  if (openBrowserEnabled) {
+  // Only auto-open when the SPA bundle is actually being served — otherwise
+  // we'd open an empty 404 page (in dev, the SPA lives on Vite at :5173).
+  if (openBrowserEnabled && webBundlePresent) {
     printLine(`› opening browser…`);
     openBrowser(`http://localhost:${resolvedPort}`);
+  } else if (!webBundlePresent) {
+    printLine(`browser not opened (no SPA bundle — see web ui hint above).`);
   } else {
     printLine(`browser not opened (--no-open).`);
   }

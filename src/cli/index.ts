@@ -119,7 +119,15 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((err: unknown) => {
-  printError(`✗ unexpected error: ${err instanceof Error ? err.message : String(err)}`);
-  process.exit(1);
-});
+// Only run main() when this file is invoked as the entry point (npm bin).
+// Importing parseArgv from this file from tests must NOT trigger main().
+import { fileURLToPath } from "node:url";
+const isEntry = process.argv[1] !== undefined &&
+  fileURLToPath(import.meta.url) === process.argv[1];
+
+if (isEntry) {
+  main().catch((err: unknown) => {
+    printError(`✗ unexpected error: ${err instanceof Error ? err.message : String(err)}`);
+    process.exit(1);
+  });
+}
