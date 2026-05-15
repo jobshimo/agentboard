@@ -59,8 +59,16 @@ export class ActivationState {
     this.#activeTools = activeTools;
   }
 
-  activate(db: Db): ActivateResult {
-    const session_id = randomUUID();
+  /**
+   * Insert a new agent session and enable the active tool set.
+   *
+   * @param presetSessionId - Optional: use this ID instead of minting a new UUID.
+   *   Used by `agentboard mcp` STDIO sessions where the session ID is minted at
+   *   startup via randomUUID() and must be stable across tool calls.
+   *   REQ-M-02
+   */
+  activate(db: Db, presetSessionId?: string): ActivateResult {
+    const session_id = presetSessionId ?? randomUUID();
     db.prepare(
       `INSERT INTO agent_sessions (id, last_event_id, connected_at, last_seen, active)
        VALUES (?, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 1)`,
@@ -68,6 +76,9 @@ export class ActivationState {
 
     if (this.#mcpServer) {
       setToolsEnabled(this.#activeTools, ACTIVE_TOOL_NAMES, true);
+      // NOTE (open Q3): for STDIO + always-on mode, sendToolListChanged() is mooted
+      // because tools are enabled before connect(). The SDK silently ignores this
+      // call on STDIO transport. Kept here so the HTTP path continues to work.
       this.#mcpServer.sendToolListChanged();
     }
 

@@ -33,7 +33,8 @@ export function installNotifyHumanTool(
         origin: "agent",
       }, eventHooks);
 
-      const result = await withPiggyback(db, extra.sessionId, { ok: true });
+      // REQ-M-02: STDIO transport does not synthesize extra.sessionId; fall back to mintedSessionId
+      const result = await withPiggyback(db, extra.sessionId ?? services.mintedSessionId, { ok: true });
       return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
     },
   });

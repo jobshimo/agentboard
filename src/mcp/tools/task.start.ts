@@ -52,7 +52,8 @@ export function installTaskStartTool(
         insertEvent(db, { taskId: args.id, type: ev.type, payload: ev.payload, origin: "agent" }, eventHooks);
       }
 
-      const result = await withPiggyback(db, extra.sessionId, {
+      // REQ-M-02: STDIO transport does not synthesize extra.sessionId; fall back to mintedSessionId
+      const result = await withPiggyback(db, extra.sessionId ?? services.mintedSessionId, {
         started_subtask: updated.id,
         task_id: args.id,
       });

@@ -18,7 +18,8 @@ export function installDeactivateTool(
     },
     callback: async (_args, extra) => {
       const { db, activation } = services;
-      const sessionId = extra.sessionId;
+      // REQ-M-02: STDIO transport does not synthesize extra.sessionId; fall back to mintedSessionId
+      const sessionId = extra.sessionId ?? services.mintedSessionId;
       if (!sessionId) throw new ValidationError("session_id is required for deactivate — call agentboard.activate() first");
 
       // Collect any final events before marking session inactive

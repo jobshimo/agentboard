@@ -16,4 +16,12 @@ export interface McpServices {
   // Event hooks wired from the broadcaster/waiters listeners.
   // Tools that insert events must pass these so subscribers are notified.
   eventHooks: InsertEventHooks;
+  /**
+   * Session ID minted at STDIO process startup (UUID v4).
+   * Set only for `agentboard mcp` STDIO sessions. Tools fall back to this
+   * when extra.sessionId is undefined (SDK does not synthesize session IDs
+   * for STDIO transport).
+   * REQ-M-02
+   */
+  mintedSessionId?: string;
 }

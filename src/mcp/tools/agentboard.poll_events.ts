@@ -17,7 +17,8 @@ export function installPollEventsTool(
     },
     callback: async (args, extra) => {
       const { db } = services;
-      const sessionId = extra.sessionId;
+      // REQ-M-02: STDIO transport does not synthesize extra.sessionId; fall back to mintedSessionId
+      const sessionId = extra.sessionId ?? services.mintedSessionId;
       if (!sessionId) throw new ValidationError("session_id is required for poll_events — call agentboard.activate() first");
 
       const { events, cursor } = pollEvents(db, sessionId, args.task_id);
