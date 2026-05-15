@@ -5,8 +5,10 @@ import {
   createReferenced,
   createLocal,
   derivedStatus,
+  seedWorkflowSubtasks,
 } from "../task.js";
 import type { SubtaskStatus } from "../subtask.js";
+import type { Workflow } from "../workflow.js";
 
 function freshDb() {
   const db = new Database(":memory:");
@@ -84,6 +86,56 @@ describe("createLocal", () => {
       workflowSnapshot: "{}",
     });
     expect(id).toMatch(/^T-\d+$/);
+  });
+});
+
+describe("seedWorkflowSubtasks", () => {
+  let db: InstanceType<typeof Database>;
+
+  beforeEach(() => { db = freshDb(); });
+  afterEach(() => db.close());
+
+  const TWO_STEP_WORKFLOW: Workflow = {
+    id: "coding-task",
+    label: "Coding Task",
+    steps: [
+      { id: "implement", label: "Implement", canAgentCompleteAlone: true },
+      { id: "review", label: "Review", canAgentCompleteAlone: false, triggeredBy: "pr_comment" },
+    ],
+  };
+
+  it("inserts one subtask per workflow step", () => {
+    const taskId = createLocal(db, { title: "T", workflowId: "coding-task", workflowSnapshot: "{}" });
+    seedWorkflowSubtasks(db, taskId, TWO_STEP_WORKFLOW);
+    const rows = db.prepare("SELECT * FROM subtasks WHERE task_id = ? ORDER BY position ASC").all(taskId) as { id: string }[];
+    expect(rows).toHaveLength(2);
+  });
+
+  it("assigns correct fields — type, step_id, label, status, custom, position", () => {
+    const taskId = createLocal(db, { title: "T", workflowId: "coding-task", workflowSnapshot: "{}" });
+    seedWorkflowSubtasks(db, taskId, TWO_STEP_WORKFLOW);
+    const rows = db.prepare("SELECT * FROM subtasks WHERE task_id = ? ORDER BY position ASC").all(taskId) as Record<string, unknown>[];
+    expect(rows[0]["type"]).toBe("workflow");
+    expect(rows[0]["step_id"]).toBe("implement");
+    expect(rows[0]["label"]).toBe("Implement");
+    expect(rows[0]["status"]).toBe("pending");
+    expect(rows[0]["custom"]).toBe(0);
+    expect(rows[0]["position"]).toBe(0);
+  });
+
+  it("maps triggered_by from the workflow step", () => {
+    const taskId = createLocal(db, { title: "T", workflowId: "coding-task", workflowSnapshot: "{}" });
+    seedWorkflowSubtasks(db, taskId, TWO_STEP_WORKFLOW);
+    const rows = db.prepare("SELECT * FROM subtasks WHERE task_id = ? ORDER BY position ASC").all(taskId) as Record<string, unknown>[];
+    expect(rows[0]["triggered_by"]).toBeNull();
+    expect(rows[1]["triggered_by"]).toBe("pr_comment");
+  });
+
+  it("assigns positions in step order starting at 0", () => {
+    const taskId = createLocal(db, { title: "T", workflowId: "coding-task", workflowSnapshot: "{}" });
+    seedWorkflowSubtasks(db, taskId, TWO_STEP_WORKFLOW);
+    const rows = db.prepare("SELECT position FROM subtasks WHERE task_id = ? ORDER BY position ASC").all(taskId) as { position: number }[];
+    expect(rows.map(r => r.position)).toEqual([0, 1]);
   });
 });
 

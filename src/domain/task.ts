@@ -1,7 +1,8 @@
 import type Database from "better-sqlite3";
-import { nextTaskId } from "./ids.js";
+import { nextTaskId, nextSubtaskId } from "./ids.js";
 import type { SubtaskStatus } from "./subtask.js";
 import { isTerminal } from "./subtask.js";
+import type { Workflow } from "./workflow.js";
 
 type Db = InstanceType<typeof Database>;
 
@@ -67,6 +68,21 @@ export function createLocal(db: Db, opts: TaskCreateOpts): string {
   `).run(id, opts.title, opts.workflowId, opts.workflowSnapshot);
 
   return id;
+}
+
+// ---------------------------------------------------------------------------
+// Workflow subtask seeding
+// ---------------------------------------------------------------------------
+
+/** Creates the initial workflow-step subtasks for a freshly-created task. */
+export function seedWorkflowSubtasks(db: Db, taskId: string, workflow: Workflow): void {
+  const insert = db.prepare(
+    `INSERT INTO subtasks (id, task_id, type, step_id, label, status, custom, triggered_by, position)
+     VALUES (?, ?, 'workflow', ?, ?, 'pending', 0, ?, ?)`,
+  );
+  workflow.steps.forEach((step, i) => {
+    insert.run(nextSubtaskId(db), taskId, step.id, step.label, step.triggeredBy ?? null, i);
+  });
 }
 
 // ---------------------------------------------------------------------------

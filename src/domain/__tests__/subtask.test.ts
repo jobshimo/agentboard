@@ -1,11 +1,28 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import Database from "better-sqlite3";
+import { runMigrations } from "../../db/migrate.js";
 import {
   SUBTASK_STATUSES,
   type SubtaskStatus,
   validTransitions,
   advanceState,
   isTerminal,
+  addCustomSubtask,
+  getSubtask,
+  applySubtaskUpdate,
+  recomputeTaskStatus,
 } from "../subtask.js";
+import { createLocal } from "../task.js";
+
+function freshDb() {
+  const db = new Database(":memory:");
+  runMigrations(db);
+  return db;
+}
+
+function makeTask(db: InstanceType<typeof Database>): string {
+  return createLocal(db, { title: "T", workflowId: "wf", workflowSnapshot: "{}" });
+}
 
 describe("SubtaskStatus", () => {
   it("recognises exactly six allowed states", () => {
@@ -87,6 +104,52 @@ describe("advanceState", () => {
   });
 });
 
+describe("addCustomSubtask", () => {
+  let db: InstanceType<typeof Database>;
+
+  beforeEach(() => { db = freshDb(); });
+  afterEach(() => db.close());
+
+  it("inserts a custom subtask and returns the row", () => {
+    const taskId = makeTask(db);
+    const row = addCustomSubtask(db, taskId, { label: "Manual review" });
+    expect(row.id).toMatch(/^s-\d+$/);
+    expect(row.task_id).toBe(taskId);
+    expect(row.label).toBe("Manual review");
+    expect(row.type).toBe("custom");
+    expect(row.custom).toBe(1);
+    expect(row.status).toBe("pending");
+  });
+
+  it("defaults type to 'custom' when not provided", () => {
+    const taskId = makeTask(db);
+    const row = addCustomSubtask(db, taskId, { label: "Ad hoc" });
+    expect(row.type).toBe("custom");
+  });
+
+  it("uses the provided type when given", () => {
+    const taskId = makeTask(db);
+    const row = addCustomSubtask(db, taskId, { label: "Check", type: "qa" });
+    expect(row.type).toBe("qa");
+  });
+
+  it("appends at end — position equals existing subtask count", () => {
+    const taskId = makeTask(db);
+    const first = addCustomSubtask(db, taskId, { label: "First" });
+    const second = addCustomSubtask(db, taskId, { label: "Second" });
+    expect(first.position).toBe(0);
+    expect(second.position).toBe(1);
+  });
+
+  it("increments position correctly when multiple subtasks exist", () => {
+    const taskId = makeTask(db);
+    addCustomSubtask(db, taskId, { label: "A" });
+    addCustomSubtask(db, taskId, { label: "B" });
+    const third = addCustomSubtask(db, taskId, { label: "C" });
+    expect(third.position).toBe(2);
+  });
+});
+
 describe("isTerminal", () => {
   it("identifies done as terminal", () => {
     expect(isTerminal("done")).toBe(true);
@@ -110,5 +173,112 @@ describe("isTerminal", () => {
 
   it("identifies in-progress as non-terminal", () => {
     expect(isTerminal("in-progress")).toBe(false);
+  });
+});
+
+describe("getSubtask", () => {
+  let db: InstanceType<typeof Database>;
+  beforeEach(() => { db = freshDb(); });
+  afterEach(() => db.close());
+
+  it("returns the row when the subtask exists", () => {
+    const taskId = makeTask(db);
+    const inserted = addCustomSubtask(db, taskId, { label: "look it up" });
+
+    const found = getSubtask(db, inserted.id);
+    expect(found?.id).toBe(inserted.id);
+    expect(found?.label).toBe("look it up");
+  });
+
+  it("returns undefined when the subtask does not exist", () => {
+    expect(getSubtask(db, "s-9999")).toBeUndefined();
+  });
+});
+
+describe("applySubtaskUpdate", () => {
+  let db: InstanceType<typeof Database>;
+  beforeEach(() => { db = freshDb(); });
+  afterEach(() => db.close());
+
+  it("updates status and returns the new row", () => {
+    const taskId = makeTask(db);
+    const inserted = addCustomSubtask(db, taskId, { label: "move me" });
+
+    const updated = applySubtaskUpdate(db, inserted.id, { status: "in-progress" });
+    expect(updated.status).toBe("in-progress");
+  });
+
+  it("updates note independently of status", () => {
+    const taskId = makeTask(db);
+    const inserted = addCustomSubtask(db, taskId, { label: "annotate me" });
+
+    const updated = applySubtaskUpdate(db, inserted.id, { note: "halfway done" });
+    expect(updated.note).toBe("halfway done");
+    expect(updated.status).toBe("pending");
+  });
+
+  it("leaves unset fields unchanged (COALESCE semantics)", () => {
+    const taskId = makeTask(db);
+    const inserted = addCustomSubtask(db, taskId, { label: "keep me" });
+    applySubtaskUpdate(db, inserted.id, { note: "first note" });
+
+    const updated = applySubtaskUpdate(db, inserted.id, { status: "in-progress" });
+    expect(updated.note).toBe("first note");
+    expect(updated.status).toBe("in-progress");
+  });
+});
+
+describe("recomputeTaskStatus", () => {
+  let db: InstanceType<typeof Database>;
+  beforeEach(() => { db = freshDb(); });
+  afterEach(() => db.close());
+
+  function statusOf(taskId: string): string {
+    return (db.prepare("SELECT derived_status FROM tasks WHERE id = ?").get(taskId) as { derived_status: string }).derived_status;
+  }
+
+  it("returns 'backlog' for a task with no subtasks", () => {
+    const taskId = makeTask(db);
+    expect(recomputeTaskStatus(db, taskId)).toBe("backlog");
+    expect(statusOf(taskId)).toBe("backlog");
+  });
+
+  it("returns 'active' when any subtask is in-progress", () => {
+    const taskId = makeTask(db);
+    const s1 = addCustomSubtask(db, taskId, { label: "one" });
+    addCustomSubtask(db, taskId, { label: "two" });
+    applySubtaskUpdate(db, s1.id, { status: "in-progress" });
+
+    expect(recomputeTaskStatus(db, taskId)).toBe("active");
+  });
+
+  it("returns 'blocked' when any subtask is blocked (overrides in-progress)", () => {
+    const taskId = makeTask(db);
+    const s1 = addCustomSubtask(db, taskId, { label: "one" });
+    const s2 = addCustomSubtask(db, taskId, { label: "two" });
+    applySubtaskUpdate(db, s1.id, { status: "in-progress" });
+    applySubtaskUpdate(db, s2.id, { status: "blocked" });
+
+    expect(recomputeTaskStatus(db, taskId)).toBe("blocked");
+  });
+
+  it("returns 'done' when every subtask is terminal", () => {
+    const taskId = makeTask(db);
+    const s1 = addCustomSubtask(db, taskId, { label: "one" });
+    const s2 = addCustomSubtask(db, taskId, { label: "two" });
+    applySubtaskUpdate(db, s1.id, { status: "in-progress" });
+    applySubtaskUpdate(db, s1.id, { status: "done" });
+    applySubtaskUpdate(db, s2.id, { status: "skipped" });
+
+    expect(recomputeTaskStatus(db, taskId)).toBe("done");
+  });
+
+  it("persists the derived status to the tasks table", () => {
+    const taskId = makeTask(db);
+    const s1 = addCustomSubtask(db, taskId, { label: "one" });
+    applySubtaskUpdate(db, s1.id, { status: "in-progress" });
+
+    recomputeTaskStatus(db, taskId);
+    expect(statusOf(taskId)).toBe("active");
   });
 });

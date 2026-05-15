@@ -1,16 +1,19 @@
 import type { FastifyInstance } from "fastify";
 import type Database from "better-sqlite3";
 import { z } from "zod";
-import { createLocal, createReferenced } from "../domain/task.js";
+import { createLocal, createReferenced, seedWorkflowSubtasks } from "../domain/task.js";
 import { appendEntry, getEntries } from "../domain/discussion.js";
-import { nextSubtaskId } from "../domain/ids.js";
 import {
   SUBTASK_STATUSES,
   validTransitions,
-  isTerminal,
-  type SubtaskStatus,
+  addCustomSubtask,
+  getSubtask,
+  applySubtaskUpdate,
+  recomputeTaskStatus,
+  type SubtaskRow,
 } from "../domain/subtask.js";
 import { insertEvent } from "../events/insert.js";
+import { findWorkflowById } from "../workflows/find.js";
 import { resolveWorkflowPaths } from "../workflows/discovery.js";
 import { loadWorkflowFile } from "../workflows/load.js";
 import { freezeWorkflow } from "../workflows/snapshot.js";
@@ -57,21 +60,6 @@ interface TaskRow {
   derived_status: string;
   created_at: string;
   closed_at: string | null;
-}
-
-interface SubtaskRow {
-  id: string;
-  task_id: string;
-  type: string;
-  step_id: string | null;
-  label: string;
-  status: string;
-  note: string | null;
-  custom: number;
-  triggered_by: string | null;
-  position: number;
-  created_at: string;
-  updated_at: string;
 }
 
 function toCompactTask(row: TaskRow): CompactTask {
@@ -250,18 +238,10 @@ function registerTaskRoutes(app: FastifyInstance, db: Db): void {
     }
     const { title, workflow_id, ref } = parsed.data;
 
-    const paths = resolveWorkflowPaths({
-      repoRoot: process.cwd(),
-      home: homedir(),
-    });
-    const workflowPath = paths.find((p) =>
-      p.endsWith(`${workflow_id}.yaml`) || p.endsWith(`${workflow_id}.yml`),
-    );
-    if (!workflowPath) {
+    const workflow = findWorkflowById({ repoRoot: process.cwd(), home: homedir() }, workflow_id);
+    if (!workflow) {
       throw new ValidationError(`unknown workflow_id: ${workflow_id}`, "use GET /api/workflows to list available workflows");
     }
-
-    const workflow = loadWorkflowFile(workflowPath);
     const snapshot = freezeWorkflow(workflow);
     const snapshotJson = JSON.stringify(snapshot);
 
@@ -283,21 +263,7 @@ function registerTaskRoutes(app: FastifyInstance, db: Db): void {
           workflowSnapshot: snapshotJson,
         });
 
-    const insertSubtask = db.prepare(
-      `INSERT INTO subtasks (id, task_id, type, step_id, label, status, custom, triggered_by, position)
-       VALUES (?, ?, ?, ?, ?, 'pending', 0, ?, ?)`,
-    );
-    workflow.steps.forEach((step, i) => {
-      insertSubtask.run(
-        nextSubtaskId(db),
-        taskId,
-        "workflow",
-        step.id,
-        step.label,
-        step.triggeredBy ?? null,
-        i,
-      );
-    });
+    seedWorkflowSubtasks(db, taskId, workflow);
 
     const task = getTask(db, taskId);
     const subtasks = getTaskSubtasks(db, taskId);
@@ -340,29 +306,16 @@ function registerTaskRoutes(app: FastifyInstance, db: Db): void {
     getTask(db, id); // throws if not found
 
     const { label, type: subtaskType } = parsed.data;
-    const position = (
-      db
-        .prepare("SELECT COUNT(*) AS cnt FROM subtasks WHERE task_id = ?")
-        .get(id) as { cnt: number }
-    ).cnt;
-
-    const subtaskId = nextSubtaskId(db);
-    db.prepare(
-      `INSERT INTO subtasks (id, task_id, type, label, status, custom, position)
-       VALUES (?, ?, ?, ?, 'pending', 1, ?)`,
-    ).run(subtaskId, id, subtaskType ?? "custom", label, position);
+    const subtask = addCustomSubtask(db, id, { label, type: subtaskType });
 
     insertEvent(db, {
       taskId: id,
       type: "custom_subtask_added",
-      payload: { subtask_id: subtaskId, label },
+      payload: { subtask_id: subtask.id, label },
       origin: "human",
     });
 
-    const row = db
-      .prepare("SELECT * FROM subtasks WHERE id = ?")
-      .get(subtaskId) as SubtaskRow;
-    reply.status(201).send(toSubtaskResponse(row));
+    reply.status(201).send(toSubtaskResponse(subtask));
   });
 
   app.post("/api/tasks/:id/feedback", async (req, reply) => {
@@ -397,16 +350,13 @@ function registerSubtaskRoutes(app: FastifyInstance, db: Db): void {
       );
     }
 
-    const current = db
-      .prepare("SELECT * FROM subtasks WHERE id = ?")
-      .get(id) as SubtaskRow | undefined;
+    const current = getSubtask(db, id);
     if (!current) throw new NotFoundError("subtask", id);
 
     const { status, note } = parsed.data;
 
     if (status !== undefined) {
-      const currentStatus = current.status as SubtaskStatus;
-      const allowed: SubtaskStatus[] = validTransitions[currentStatus] ?? [];
+      const allowed = validTransitions[current.status] ?? [];
       if (!allowed.includes(status)) {
         throw new StateError(
           `Cannot transition subtask ${id} from "${current.status}" to "${status}"`,
@@ -415,43 +365,18 @@ function registerSubtaskRoutes(app: FastifyInstance, db: Db): void {
       }
     }
 
-    db.prepare(
-      `UPDATE subtasks
-       SET status = COALESCE(?, status),
-           note   = COALESCE(?, note),
-           updated_at = CURRENT_TIMESTAMP
-       WHERE id = ?`,
-    ).run(status ?? null, note ?? null, id);
+    const updated = applySubtaskUpdate(db, id, { status, note });
 
     if (status !== undefined) {
-      const taskId = current.task_id;
       insertEvent(db, {
-        taskId,
+        taskId: current.task_id,
         type: "subtask_updated",
         payload: { subtask_id: id, status },
         origin: "human",
       });
-
-      // Recompute derived_status on the parent task
-      const subtaskStatuses = (
-        db
-          .prepare("SELECT status FROM subtasks WHERE task_id = ?")
-          .all(taskId) as { status: string }[]
-      ).map((r) => r.status);
-
-      let newTaskStatus = "backlog";
-      if (subtaskStatuses.some((s) => s === "blocked")) newTaskStatus = "blocked";
-      else if (subtaskStatuses.some((s) => s === "in-progress")) newTaskStatus = "active";
-      else if (subtaskStatuses.every((s) => isTerminal(s as SubtaskStatus))) newTaskStatus = "done";
-
-      db.prepare(
-        "UPDATE tasks SET derived_status = ? WHERE id = ?",
-      ).run(newTaskStatus, taskId);
+      recomputeTaskStatus(db, current.task_id);
     }
 
-    const updated = db
-      .prepare("SELECT * FROM subtasks WHERE id = ?")
-      .get(id) as SubtaskRow;
     reply.send(toSubtaskResponse(updated));
   });
 }
