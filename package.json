@@ -12,8 +12,12 @@
     "agentboard": "dist/cli/index.js"
   },
   "packageManager": "pnpm@11.1.2",
+  "files": [
+    "dist/",
+    "templates/"
+  ],
   "scripts": {
-    "build": "tsc --project tsconfig.build.json",
+    "build": "tsc --project tsconfig.build.json && node scripts/copy-migrations.mjs",
     "build:web": "vite build --config src/web/vite.config.ts",
     "dev:web": "vite dev --config src/web/vite.config.ts",
     "test": "vitest run",

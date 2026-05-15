@@ -1,0 +1,34 @@
+id: coding-task
+name: Coding Task
+description: Standard coding task — implement, test, review, commit.
+
+steps:
+  - id: implement
+    label: Implement
+    type: agent
+    agent_hint: Write the code. Prefer small, focused commits.
+    can_agent_complete_alone: true
+    requires_human: false
+
+  - id: tests
+    label: Write Tests
+    type: agent
+    agent_hint: Add or update tests. Coverage must not regress.
+    can_agent_complete_alone: true
+    requires_human: false
+    blocks_next: review
+
+  - id: review
+    label: Review
+    type: human
+    agent_hint: Human reviews diff before any merge action.
+    can_agent_complete_alone: false
+    requires_human: true
+    triggered_by: pr_ready
+
+  - id: commit
+    label: Commit & Push
+    type: agent
+    agent_hint: Commit with a conventional commit message, push, open PR.
+    can_agent_complete_alone: true
+    requires_human: false

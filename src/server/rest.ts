@@ -27,6 +27,7 @@ import { resolveWorkflowPaths } from "../workflows/discovery.js";
 import { loadWorkflowFile } from "../workflows/load.js";
 import { freezeWorkflow } from "../workflows/snapshot.js";
 import { renderTaskMarkdown } from "./markdown.js";
+import { runExportSnapshot } from "./export.js";
 import {
   NotFoundError,
   ValidationError,
@@ -34,7 +35,6 @@ import {
 } from "./errors.js";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { mkdirSync, writeFileSync } from "node:fs";
 
 type Db = InstanceType<typeof Database>;
 
@@ -372,42 +372,9 @@ function registerWorkflowRoutes(app: FastifyInstance): void {
 
 function registerExportRoute(app: FastifyInstance, db: Db): void {
   app.post("/api/export", async (_req, reply) => {
-    const tasks = listTasks(db);
-
     const snapshotDir = join(process.cwd(), ".agentboard", "snapshot");
-    mkdirSync(snapshotDir, { recursive: true });
-
-    for (const task of tasks) {
-      const subtasks = getTaskSubtasks(db, task.id);
-      const discussionResult = getEntries(db, task.id);
-      const discussion =
-        discussionResult.type === "entries" ? discussionResult.entries : [];
-
-      const md = renderTaskMarkdown({
-        id: task.id,
-        title: task.title,
-        type: task.type as "referenced" | "local",
-        derivedStatus: task.derived_status,
-        refSource: task.ref_source,
-        refId: task.ref_id,
-        refUrl: task.ref_url,
-        workflowId: task.workflow_id,
-        createdAt: task.created_at,
-        closedAt: task.closed_at,
-        subtasks: subtasks.map((s) => ({
-          id: s.id,
-          label: s.label,
-          status: s.status,
-          note: s.note,
-          custom: s.custom === 1,
-        })),
-        discussion,
-      });
-
-      writeFileSync(join(snapshotDir, `${task.id}.md`), md, "utf8");
-    }
-
-    reply.send({ path: snapshotDir, count: tasks.length });
+    const result = runExportSnapshot(db, snapshotDir);
+    reply.send(result);
   });
 }
 
