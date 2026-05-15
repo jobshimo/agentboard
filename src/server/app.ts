@@ -6,6 +6,7 @@ import { toHttpError } from "./errors.js";
 import { registerRestRoutes } from "./rest.js";
 import { registerWsRoute } from "./ws.js";
 import { BroadcastManager } from "./broadcaster.js";
+import { WaiterRegistry } from "../events/wait.js";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { join, dirname } from "node:path";
@@ -32,13 +33,15 @@ function readVersion(): string {
 
 const startedAt = Date.now();
 
-export function buildApp(opts: AppOpts): FastifyInstance & { broadcaster: BroadcastManager } {
+export function buildApp(opts: AppOpts): FastifyInstance & { broadcaster: BroadcastManager; waiters: WaiterRegistry } {
   const app = Fastify({
     logger: opts.logger ?? false,
-  }) as FastifyInstance & { broadcaster: BroadcastManager };
+  }) as FastifyInstance & { broadcaster: BroadcastManager; waiters: WaiterRegistry };
 
   const broadcaster = new BroadcastManager();
+  const waiters = new WaiterRegistry();
   app.broadcaster = broadcaster;
+  app.waiters = waiters;
 
   app.register(fastifyWebsocket);
 
@@ -55,7 +58,7 @@ export function buildApp(opts: AppOpts): FastifyInstance & { broadcaster: Broadc
     });
   });
 
-  registerRestRoutes(app, opts.db, { listeners: [broadcaster.listener] });
+  registerRestRoutes(app, opts.db, { listeners: [broadcaster.listener, waiters.listener] });
   registerWsRoute(app, broadcaster);
 
   return app;
