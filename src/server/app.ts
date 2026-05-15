@@ -54,6 +54,11 @@ export interface AppOpts {
    */
   agbHome?: string;
   logger?: boolean | object;
+  /**
+   * The port the server is listening on.
+   * When provided, included in /api/health for daemon identity (REQ-D-01).
+   */
+  port?: number;
 }
 
 function readVersion(): string {
@@ -128,11 +133,19 @@ export function buildApp(opts: AppOpts): FastifyInstance & { broadcaster: Broadc
   // Routes
   // ---------------------------------------------------------------------------
 
+  // REQ-D-01: identity fields pid + port so agentboard stop/status can confirm
+  // this is OUR daemon and not a foreign process that happened to bind the port.
+  // Port is read from the Fastify server's listening address at request time so it
+  // is accurate even when resolvedPort is determined after buildApp() returns.
   app.get("/api/health", async (_req, reply) => {
+    const addr = app.server.address();
+    const listeningPort = addr !== null && typeof addr === "object" ? addr.port : (opts.port ?? null);
     reply.send({
       ok: true,
       version: readVersion(),
       uptime_ms: Date.now() - startedAt,
+      pid: process.pid,
+      port: listeningPort,
     });
   });
 

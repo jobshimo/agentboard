@@ -10,6 +10,7 @@ import { loadConfig } from "../config/load.js";
 import { runEventGc } from "../events/gc.js";
 import { initDb, seedUserWorkflows } from "./init.js";
 import { getVersion } from "./version.js";
+import { writePidFile, unlinkPidFile } from "./spawn-daemon.js";
 import {
   printLine,
   printBanner,
@@ -64,6 +65,8 @@ export async function runStart(opts: StartOpts): Promise<void> {
 
   // S1: buildApp no longer accepts a db argument. DB is now resolved per-request
   // from the ?repo= query param via the onRequest hook.
+  // S2: /api/health reads port from app.server.address() at request time so no
+  // need to pass it to buildApp.
   const app = buildApp({
     agbHome,
     logger: verbose ? { level: "info" } : false,
@@ -81,6 +84,9 @@ export async function runStart(opts: StartOpts): Promise<void> {
   }
 
   await app.listen({ port: resolvedPort, host: "127.0.0.1" });
+
+  // REQ-D-03: write PID file after successful listen
+  writePidFile(process.pid, agbHome);
 
   const webBundlePresent = hasWebBundle();
 
@@ -121,12 +127,19 @@ export async function runStart(opts: StartOpts): Promise<void> {
   // Keep the interval from preventing clean shutdown on SIGINT.
   gcInterval.unref();
 
-  // Graceful shutdown: close Fastify + all SQLite instances on SIGINT (ctrl-c).
-  // S2 will add SIGTERM handler; for now SIGINT only.
-  process.once("SIGINT", async () => {
+  // Graceful shutdown: close Fastify + all SQLite instances on SIGINT (ctrl-c)
+  // and SIGTERM (agentboard stop).
+  // REQ-D-02, REQ-S-05
+  const shutdown = async () => {
     clearInterval(gcInterval);
     await app.close();
     closeAllDbs();
+    unlinkPidFile(agbHome);
+    // Safety force-exit after 5s in case close() hangs
+    setTimeout(() => process.exit(0), 5000).unref();
     process.exit(0);
-  });
+  };
+
+  process.once("SIGINT", shutdown);
+  process.once("SIGTERM", shutdown);
 }
