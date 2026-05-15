@@ -204,10 +204,10 @@ Slices are ordered by dependency. Sequential constraints noted per slice.
 
 | # | Task | Commit | Spec refs |
 |---|------|--------|-----------|
-| 2.10c.1 | `src/web/src/components/SubtaskRow.tsx`: detail row with `requiresHuman` chip (`can_agent_complete_alone: false`). State dot with same click/right-click controls as board. `triggered_by` badge when set. | `feat(web): SubtaskRow with human-required chip` | design §5.1, §5.4, agentboard/components.jsx |
-| 2.10c.2 | `src/web/src/components/Message.tsx`, `AuthorAvatar.tsx`, `Markdown.tsx`: `Markdown` uses `react-markdown` (note: audit gzipped size; if >25kB over hand-rolled, replace per design §8 item 5). | `feat(web): Message, AuthorAvatar, Markdown components` | design §5.1, §8 item 5, agentboard/components.jsx |
-| 2.10c.3 | `src/web/src/components/NotificationItem.tsx`: bell popover row. Stack-by-task with count. | `feat(web): NotificationItem for bell popover` | design §5.4 notification grouping, agentboard/components.jsx |
-| 2.10c.4 | `src/web/src/views/TaskDetail.tsx`: full-page replacement view. Subtask list with `SubtaskRow`. Discussion thread with `Message`. Composer (textarea + POST `/api/tasks/:id/comments`). `useTask(id)` + `useDiscussion(id)`. Feedback form (POST `/api/tasks/:id/feedback`). | `feat(web): TaskDetail full-page view with discussion and feedback` | design §5.1, §5.4 task detail, agentboard/detail.jsx |
+| 2.10c.1 | [x] `src/web/src/components/SubtaskRow.tsx`: detail row with `requiresHuman` chip (`can_agent_complete_alone: false`). State dot with same click/right-click controls as board. `triggered_by` badge when set. | `feat(web): SubtaskRow with human-required chip` | design §5.1, §5.4, agentboard/components.jsx |
+| 2.10c.2 | [x] `src/web/src/components/Message.tsx` (in views/detail/), `AuthorAvatar.tsx`, `Markdown.tsx`: `Markdown` uses `react-markdown`. | `feat(web): Message, AuthorAvatar, Markdown components` | design §5.1, §8 item 5, agentboard/components.jsx |
+| 2.10c.3 | [x] `src/web/src/components/NotificationItem.tsx`: bell popover row. Urgency-driven tone and icon. | `feat(web): NotificationItem for bell popover` | design §5.4 notification grouping, agentboard/components.jsx |
+| 2.10c.4 | [x] `src/web/src/views/TaskDetail.tsx`: full-page replacement view. Subtask list with `SubtaskRow`. Discussion thread with `DiscussionThread`/`Message`. Composer (`CommentForm`). `useTaskDetailData(id)` hook. Feedback form (`FeedbackForm`). | `feat(web): TaskDetail full-page view with discussion and feedback` | design §5.1, §5.4 task detail, agentboard/detail.jsx |
 
 ---
 

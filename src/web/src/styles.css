@@ -757,5 +757,25 @@ html, body, #root { margin: 0; padding: 0; height: 100%; }
 .empty pre .comment { color: var(--fg-subtle); }
 .empty pre .ok { color: var(--success-fg); }
 
+/* Banner — inline callout used in TaskDetail (workflow immutability hint, etc.) */
+.banner {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-muted);
+  border-left-width: 3px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+  font-size: 12.5px;
+}
+.banner[data-tone="warning"] { border-left-color: var(--warning-fg); }
+.banner[data-tone="info"]    { border-left-color: var(--accent-fg); }
+.banner[data-tone="danger"]  { border-left-color: var(--danger-fg); }
+.banner[data-tone="success"] { border-left-color: var(--success-fg); }
+.banner .icon { color: var(--warning-fg); flex-shrink: 0; }
+.banner[data-tone="info"]    .icon { color: var(--accent-fg); }
+.banner[data-tone="danger"]  .icon { color: var(--danger-fg); }
+.banner[data-tone="success"] .icon { color: var(--success-fg); }
+.banner strong { color: var(--fg-default); }
+
 /* Misc */
 .divider { height: 1px; background: var(--border-muted); margin: 0; border: 0; }

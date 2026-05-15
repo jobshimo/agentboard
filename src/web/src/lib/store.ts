@@ -5,6 +5,7 @@
 
 import { useSyncExternalStore } from "react";
 import type { ViewName, RouteMatch } from "../router/route";
+import type { CompactTask, TaskFull, SubtaskCompact, DiscussionEntry } from "./api";
 
 export type ConnectionState = "connected" | "reconnecting" | "offline";
 
@@ -17,19 +18,6 @@ export interface Notification {
   at: string;
 }
 
-// Compact task shape returned by GET /api/tasks
-export interface CompactTask {
-  id: string;
-  title: string;
-  type: "referenced" | "local";
-  ref_source: string | null;
-  ref_id: string | null;
-  ref_url: string | null;
-  workflow_id: string;
-  derived_status: "backlog" | "active" | "blocked" | "done";
-  created_at: string;
-}
-
 export interface StoreState {
   tasks: CompactTask[];
   notifications: Notification[];
@@ -38,7 +26,13 @@ export interface StoreState {
   // Board view state — shared between Sidebar (filter setter) and Board (consumer)
   workflowFilter: string | null;
   columnMode: "macro" | "workflow";
+  // Task detail state — keyed by task id so navigating back/forward doesn't flash empty
+  taskDetail: Record<string, TaskFull>;
+  discussion: Record<string, DiscussionEntry[]>;
 }
+
+// Re-export types — consumers can import CompactTask, TaskFull, etc. from either api or store.
+export type { CompactTask, TaskFull, SubtaskCompact, DiscussionEntry };
 
 type Listener = () => void;
 
@@ -51,6 +45,8 @@ let state: StoreState = {
   route: { view: "board" },
   workflowFilter: null,
   columnMode: "macro",
+  taskDetail: {},
+  discussion: {},
 };
 
 function getSnapshot(): StoreState {
@@ -76,7 +72,12 @@ export type Action =
   | { type: "MARK_ALL_READ" }
   | { type: "SET_ROUTE"; route: RouteMatch }
   | { type: "SET_WORKFLOW_FILTER"; workflowFilter: string | null }
-  | { type: "SET_COLUMN_MODE"; columnMode: "macro" | "workflow" };
+  | { type: "SET_COLUMN_MODE"; columnMode: "macro" | "workflow" }
+  // S10c — task detail actions
+  | { type: "SET_TASK_DETAIL"; task: TaskFull }
+  | { type: "SET_DISCUSSION"; taskId: string; entries: DiscussionEntry[] }
+  | { type: "APPEND_DISCUSSION_ENTRY"; taskId: string; entry: DiscussionEntry }
+  | { type: "UPSERT_SUBTASK"; taskId: string; subtask: SubtaskCompact };
 
 export function dispatch(action: Action): void {
   switch (action.type) {
@@ -101,6 +102,27 @@ export function dispatch(action: Action): void {
     case "SET_COLUMN_MODE":
       state = { ...state, columnMode: action.columnMode };
       break;
+    case "SET_TASK_DETAIL":
+      state = { ...state, taskDetail: { ...state.taskDetail, [action.task.id]: action.task } };
+      break;
+    case "SET_DISCUSSION":
+      state = { ...state, discussion: { ...state.discussion, [action.taskId]: action.entries } };
+      break;
+    case "APPEND_DISCUSSION_ENTRY": {
+      const prev = state.discussion[action.taskId] ?? [];
+      state = { ...state, discussion: { ...state.discussion, [action.taskId]: [...prev, action.entry] } };
+      break;
+    }
+    case "UPSERT_SUBTASK": {
+      const detail = state.taskDetail[action.taskId];
+      if (detail) {
+        const updated = detail.subtasks.map(s => s.id === action.subtask.id ? action.subtask : s);
+        const hadIt = detail.subtasks.some(s => s.id === action.subtask.id);
+        const subtasks = hadIt ? updated : [...detail.subtasks, action.subtask];
+        state = { ...state, taskDetail: { ...state.taskDetail, [action.taskId]: { ...detail, subtasks } } };
+      }
+      break;
+    }
   }
   notifyListeners();
 }
@@ -114,6 +136,8 @@ export function _resetStore(initial?: Partial<StoreState>): void {
     route: { view: "board" },
     workflowFilter: null,
     columnMode: "macro",
+    taskDetail: {},
+    discussion: {},
     ...initial,
   };
   // Do NOT notify — tests control when assertions run.
@@ -143,6 +167,15 @@ export function useWorkflowFilter(): string | null {
 
 export function useColumnMode(): "macro" | "workflow" {
   return useSyncExternalStore(subscribe, () => getSnapshot().columnMode);
+}
+
+// S10c — task detail hooks
+export function useTaskDetail(id: string): TaskFull | null {
+  return useSyncExternalStore(subscribe, () => getSnapshot().taskDetail[id] ?? null);
+}
+
+export function useDiscussion(id: string): DiscussionEntry[] {
+  return useSyncExternalStore(subscribe, () => getSnapshot().discussion[id] ?? []);
 }
 
 // For non-React consumers (e.g. ws.ts needs to read current view).
