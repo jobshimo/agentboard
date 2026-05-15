@@ -118,3 +118,74 @@ getEntries and getAllEntries duplicate row to DiscussionEntry mapping (~15 LOC).
 C3 and C5 clean. The three apply-progress warnings clean. Orig W1/W2/W5 deferred.
 
 After fix-up slice lands and tests stay green, change is archive-ready (modulo orig W1 spec amendment which can be its own PR).
+
+
+---
+
+# SDD Verify Report Round 3 -- agentboard-mvp
+
+**Date**: 2026-05-15
+**Verdict**: APPROVED -- 4 RESOLVED (C1, C2, C4, N1), 0 new findings, 0 regressions
+**Tests**: 494/494 passing across 43 files (`npx vitest run`).
+
+The round-2 fix slice landed every outstanding PARTIAL with full spec compliance and test coverage. No regressions found. The change is archive-ready modulo deferred SUGGESTIONs (orig W1 spec amendment, W2 agent_sees_human_events flag, W5 Phase 3 cross-cutting tests) which remain open as follow-up engram items.
+
+## Per-finding resolution
+
+### C1 -- `agentboard init` template copy -- RESOLVED
+
+All four round-2 spec gaps closed in `src/cli/init.ts`:
+
+1. Source path fixed: `copyWorkflowTemplate` reads from `~/.agentboard/workflows/` (sorted, first `.yaml`/`.yml`) -- matches launcher.md L40.
+2. Destination filename fixed: writes to `<cwd>/.agentboard/workflow.yaml` (singular, no subdir) -- matches launcher.md L40 + L48.
+3. Exit-code contract honored: `process.exit(1)` when global dir missing (init.ts:75) and when dir is empty (init.ts:87) -- matches launcher.md L51-55.
+4. Refuse messaging present: `process.exit(1)` with informative message when destination exists (init.ts:93-99) -- matches launcher.md L57-62.
+
+Architecture decision: `runStart` now calls `initDb + seedUserWorkflows` (first-run UX seeds global dir from bundled template). `runInit` calls `initDb + copyWorkflowTemplate`. Separation prevents server startup from accidentally refusing due to existing workflow.yaml.
+
+Test coverage: 10 init tests + 2 seedUserWorkflows tests (`src/cli/__tests__/init.test.ts`), each spec scenario has a dedicated test (success path, refuse-on-overwrite, missing global dir, empty global dir).
+
+### C2 -- triggered_by deferred materialization wired end-to-end -- RESOLVED
+
+`createTriggerMaterializer(db)` lives in `src/events/triggered-materializer.ts` and is wired as the third entry in `sharedListeners` (broadcaster + waiters + materializer) inside `buildApp` (`src/server/app.ts:79-80`). Both REST hooks and MCP `eventHooks` reuse the same `sharedListeners` reference -- single materializer instance across both adapters.
+
+Listener implementation: rehydrates the workflow snapshot from `tasks.workflow_snapshot`, scans for any step whose `triggeredBy === event.type`, and calls `materializeTriggeredSubtask` (which is idempotent via the existing `step_id` uniqueness check). Skips `_global` events. Swallows malformed snapshot JSON without crashing the insert pipeline.
+
+Spec contract (workflows.md L83-88): WHEN an event of type `pr_comment` is recorded for a task whose snapshot has a `triggered_by: pr_comment` step, THEN that subtask MUST be created -- satisfied end-to-end with 4 integration tests in `src/events/__tests__/triggered-materializer.test.ts` (creation, idempotency on duplicate events, no-op on non-matching event type, no-op on `_global` events).
+
+### C4 -- correct event types for status transitions -- RESOLVED
+
+All three round-2 payload defects fixed in `src/domain/subtask.ts` applyStatusTransition:
+
+a) `task_blocked` payload now `{ task_id, subtask_id }` (subtask.ts:191) -- matches event-queue.md L48. Dedicated test "task_blocked payload includes both task_id and subtask_id (spec L48)" in `subtask.test.ts:321`.
+
+b) `task.start.ts` rerouted through `applyStatusTransition` (task.start.ts:44-49). `status_change` payload now carries `{ task_id, subtask_id, from_status, to_status }` -- matches event-queue.md L42. Dedicated test "status_change payload includes task_id, subtask_id, from_status, to_status (spec L42)" in `tools.test.ts:246`.
+
+c) `subtask_updated` payload for note-only updates now `{ task_id, subtask_id, field: "note", value }` in both adapters (subtask.update.ts:64, rest.ts:357) -- matches event-queue.md L44. Dedicated test "subtask_updated payload uses { task_id, subtask_id, field, value } shape (spec L44)" in `tools.test.ts:391`.
+
+### N1 -- single write when status+note both change -- RESOLVED
+
+`applyStatusTransition(db, id, from, to, note?)` accepts an optional `note` and forwards it to the single `applySubtaskUpdate` call (subtask.ts:180). Both adapters (`subtask.update.ts:54`, `rest.ts:347`) pass `note` into the transition call. No second UPDATE statement is issued. Test "single write when both status and note change" in `subtask.test.ts` and `tools.test.ts`.
+
+### N2 -- discussion.ts row-mapping deduplication -- RESOLVED (cosmetic)
+
+`mapEntryRow(r: DiscussionRow): DiscussionEntry` extracted at `src/domain/discussion.ts:31-33`. Both `getEntries` and `getAllEntries` now use `rows.map(mapEntryRow)`. `DiscussionRow` extracted as a private type alias.
+
+## Regression scan (new issues introduced by round-2 fix slice)
+
+None. Concretely checked:
+
+- `runStart` continues to work even when `~/.agentboard/workflows/` is empty: `initDb` no longer requires a workflow file (separation of concerns from C1 fix) and `seedUserWorkflows` is silent if the bundled template is missing.
+- The third `sharedListeners` entry (materializer) does not break broadcaster or waiter semantics -- 27 rest tests + 47 mcp tools tests + 10 ws tests all green.
+- `applyStatusTransition` note-forwarding is opt-in (parameter is `note?: string`), so existing callers without note still produce identical SQL.
+- `task.start` payload now exposes `task_id` -- consumers that only read `subtask_id` (web ws.test.ts) are unaffected because the payload is additive.
+
+## Deferred items (open, not blocking archive)
+
+- **Orig W1** -- spec says 6-8 active tools, design + implementation expose 14. Needs spec amendment PR. Not a code defect.
+- **Orig W2** -- `attention.agent_sees_human_events` flag not threaded into piggyback. Functionality is currently always-on. Tracked as a follow-up.
+- **Orig W5** -- Phase 3 cross-cutting tests (e2e activation lifecycle, full token-budget audit, GC integration with WaiterRegistry). Would have caught C1/C2/C4 earlier; valuable hardening but not a spec violation.
+
+## Verdict
+
+**APPROVED.** All CRITICALs from rounds 1+2 closed with spec-traceable tests. 494/494 green. Recommend `sdd-apply` for Phase 4 docs (or `sdd-archive` directly if docs are out-of-scope for this change).
