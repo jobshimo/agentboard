@@ -4,6 +4,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
+import { exec } from "node:child_process";
 import { runStart } from "./start.js";
 import { runInit } from "./init.js";
 import { runExport } from "./export.js";
@@ -12,6 +13,7 @@ import { runStatus } from "./status.js";
 import { getVersion } from "./version.js";
 import { printLine, printError, printHelp } from "./output.js";
 import { getDb } from "../db/connection.js";
+import { probeForExistingDaemon } from "./spawn-daemon.js";
 
 interface ParsedArgs {
   command: "start" | "daemon" | "init" | "export" | "stop" | "status" | "mcp" | "help" | "version";
@@ -161,10 +163,40 @@ async function main(): Promise<void> {
     }
 
     // "daemon" is an alias for "start" (REQ-L-02)
+    // REQ-L-01: probe first — reuse an already-running daemon instead of crashing
     case "daemon":
-    case "start":
+    case "start": {
+      const config = (await import("../config/load.js")).loadConfig(agbHome);
+      const resolvedPort = port !== 0 ? port : config.server.port;
+
+      const probe = await probeForExistingDaemon(resolvedPort, agbHome);
+
+      if ("alreadyRunning" in probe) {
+        const url = `http://localhost:${probe.port}/?repo=${encodeURIComponent(cwd)}`;
+        if (!noOpen) {
+          const cmd =
+            process.platform === "win32"
+              ? `start "" "${url}"`
+              : process.platform === "darwin"
+                ? `open "${url}"`
+                : `xdg-open "${url}"`;
+          exec(cmd, () => { /* non-fatal */ });
+        }
+        printLine(`agentboard already running on :${probe.port} (PID ${probe.pid}).`);
+        printLine(`› ${url}`);
+        process.exit(0);
+      }
+
+      if ("foreignProcess" in probe) {
+        printError(`✗ port ${probe.port} is held by a non-agentboard process.`);
+        printError(`  Use --port to choose a different port or stop the occupying process.`);
+        process.exit(1);
+      }
+
+      // probe.free === true → nothing listening, start fresh
       await runStart({ port, noOpen, verbose, cwd });
       break;
+    }
   }
 }
 

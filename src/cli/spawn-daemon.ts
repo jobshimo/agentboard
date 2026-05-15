@@ -60,7 +60,7 @@ export function unlinkPidFile(agbHome: string): void {
 }
 
 // ---------------------------------------------------------------------------
-// Health probe type
+// Health probe types
 // ---------------------------------------------------------------------------
 
 interface HealthResponse {
@@ -70,6 +70,15 @@ interface HealthResponse {
   uptime_ms?: number;
   version?: string;
 }
+
+/**
+ * Structured result returned by probeForExistingDaemon.
+ * Discriminated union — callers must check the shape before acting.
+ */
+export type DaemonProbeResult =
+  | { alreadyRunning: true; pid: number; port: number }
+  | { foreignProcess: true; port: number }
+  | { free: true };
 
 // ---------------------------------------------------------------------------
 // spawnDaemon
@@ -119,6 +128,51 @@ async function probeHealth(
     // Timeout, ECONNREFUSED, etc. → not listening
     return { status: "gone" };
   }
+}
+
+/**
+ * Probe whether a daemon is already listening on `port`.
+ *
+ * Handles the stale-PID case: if a PID file exists but the process is dead
+ * (kill -0 throws ESRCH), the file is unlinked before probing the port.
+ *
+ * Returns one of three states:
+ *  - alreadyRunning — /api/health → 200 + ok=true (our daemon, safe to reuse)
+ *  - foreignProcess — port is held by something else (caller should error)
+ *  - free           — nothing listening, safe to spawn
+ *
+ * REQ-L-01
+ */
+export async function probeForExistingDaemon(
+  port: number,
+  agbHome: string,
+  fetchFn: typeof fetch = globalThis.fetch,
+): Promise<DaemonProbeResult> {
+  // Clean up stale PID file before probing
+  const existingPid = readPidFile(agbHome);
+  if (existingPid !== null) {
+    try {
+      process.kill(existingPid, 0);
+    } catch {
+      // ESRCH — process is gone, remove the stale file
+      unlinkPidFile(agbHome);
+    }
+  }
+
+  const probe = await probeHealth(port, HEALTH_PROBE_TIMEOUT_MS, fetchFn);
+
+  if (probe.status === "ok") {
+    const pid = probe.health.pid ?? 0;
+    const resolvedPort = probe.health.port ?? port;
+    return { alreadyRunning: true, pid, port: resolvedPort };
+  }
+
+  if (probe.status === "foreign") {
+    return { foreignProcess: true, port };
+  }
+
+  // "gone" — ECONNREFUSED or timeout → port is free
+  return { free: true };
 }
 
 /**

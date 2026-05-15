@@ -62,7 +62,7 @@ export function printBanner(opts: {
   } else {
     printLine(`${c.yellow}!${c.reset} ${c.dim}web ui     ${c.reset} ${c.dim}no dist/web/ bundle — run ${c.reset}${c.bold}pnpm dev:web${c.reset}${c.dim} (Vite on :5173)${c.reset}`);
   }
-  printLine(`${c.green}✓${c.reset} ${c.dim}mcp        ${c.reset} ${c.cyan}http://localhost:${port}/mcp${c.reset}`);
+  printLine(`${c.green}✓${c.reset} ${c.dim}mcp        ${c.reset} ${c.dim}STDIO — run ${c.reset}${c.bold}agentboard mcp${c.reset}${c.dim} (for agent integration)${c.reset}`);
   printLine(`${c.green}✓${c.reset} ${c.dim}websocket  ${c.reset} ${c.cyan}ws://localhost:${port}/ws${c.reset}`);
   printLine("");
 }
@@ -88,13 +88,18 @@ export function printHelp(): void {
   printLine(`  ${c.bold}npx @jobshimo/agentboard${c.reset} ${c.dim}[command]${c.reset} ${c.dim}[flags]${c.reset}`);
   printLine("");
   printLine(`${c.dim}commands${c.reset}`);
-  printLine(`  ${c.cyan}(default)${c.reset}        ${c.dim}start server and open browser${c.reset}`);
+  printLine(`  ${c.cyan}(default)${c.reset}        ${c.dim}start daemon (idempotent — reuses running instance)${c.reset}`);
+  printLine(`  ${c.cyan}daemon${c.reset}           ${c.dim}alias for default start command${c.reset}`);
+  printLine(`  ${c.cyan}stop${c.reset}             ${c.dim}stop the running daemon${c.reset}`);
+  printLine(`  ${c.cyan}status${c.reset}           ${c.dim}show daemon status (port, PID, uptime)${c.reset}`);
+  printLine(`  ${c.cyan}mcp${c.reset}              ${c.dim}run MCP server over STDIO (for agent integration)${c.reset}`);
   printLine(`  ${c.cyan}init${c.reset}             ${c.dim}copy a workflow template into .agentboard/${c.reset}`);
   printLine(`  ${c.cyan}export${c.reset}           ${c.dim}dump board state to .agentboard/snapshot/${c.reset}`);
   printLine("");
   printLine(`${c.dim}flags${c.reset}`);
   printLine(`  ${c.cyan}--port${c.reset} ${c.dim}<n>${c.reset}       ${c.dim}override default port (7733)${c.reset}`);
   printLine(`  ${c.cyan}--no-open${c.reset}        ${c.dim}start server without opening the browser${c.reset}`);
+  printLine(`  ${c.cyan}--repo${c.reset} ${c.dim}<path>${c.reset}    ${c.dim}repo root for mcp subcommand${c.reset}`);
   printLine(`  ${c.cyan}--help${c.reset}           ${c.dim}this screen${c.reset}`);
   printLine(`  ${c.cyan}--version${c.reset}        ${c.dim}print version and exit${c.reset}`);
   printLine("");
