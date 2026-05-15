@@ -1,15 +1,15 @@
 /**
  * `agentboard doctor` — structured diagnostic report.
- * Implemented in commit 9. This module is a placeholder that satisfies the
- * import in index.ts until the full implementation lands.
  */
+import { buildDoctorReport, formatDoctorReport } from "./doctor-report.js";
+import { printLine } from "./output.js";
 
 export interface DoctorOptions {
   agbHome: string;
 }
 
-export async function runDoctor(_opts: DoctorOptions): Promise<void> {
-  // Full implementation in commit 9 (feat(cli): agentboard doctor command).
-  // Stub: no-op placeholder so the CLI can import without error.
-  throw new Error("doctor command not yet implemented — coming in a later commit");
+export async function runDoctor(opts: DoctorOptions): Promise<void> {
+  const report = await buildDoctorReport({ agbHome: opts.agbHome });
+  const output = formatDoctorReport(report);
+  printLine(output);
 }
