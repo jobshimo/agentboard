@@ -44,6 +44,11 @@ import { join } from "node:path";
 // Compact response shapes
 // ---------------------------------------------------------------------------
 
+interface CompactSubtaskSummary {
+  type: string;
+  status: string;
+}
+
 interface CompactTask {
   id: string;
   title: string;
@@ -53,9 +58,12 @@ interface CompactTask {
   ref_source: string | null;
   ref_id: string | null;
   created_at: string;
+  /** Minimal subtask summary for WorkflowStrip — avoids a per-card round-trip to GET /api/tasks/:id */
+  subtasks: CompactSubtaskSummary[];
 }
 
-function toCompactTask(row: TaskRow): CompactTask {
+function toCompactTask(row: TaskRow, db: Parameters<typeof getTask>[0]): CompactTask {
+  const subtaskRows = getTaskSubtasks(db, row.id);
   return {
     id: row.id,
     title: row.title,
@@ -65,6 +73,7 @@ function toCompactTask(row: TaskRow): CompactTask {
     ref_source: row.ref_source,
     ref_id: row.ref_id,
     created_at: row.created_at,
+    subtasks: subtaskRows.map((s) => ({ type: s.type, status: s.status })),
   };
 }
 
@@ -166,7 +175,7 @@ function registerTaskRoutes(app: FastifyInstance, broadcaster: BroadcastManager,
   const getHooks = buildHooks(app, broadcaster, waiters);
 
   app.get("/api/tasks", async (req, reply) => {
-    reply.send(listTasks(req.db).map(toCompactTask));
+    reply.send(listTasks(req.db).map((row) => toCompactTask(row, req.db)));
   });
 
   app.get("/api/tasks/:id", async (req, reply) => {

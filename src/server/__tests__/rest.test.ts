@@ -96,6 +96,19 @@ describe("GET /api/tasks", () => {
     expect(first?.id).toMatch(/^T-\d+$/);
     expect(first?.derived_status).toBe("backlog");
   });
+
+  it("includes subtasks array with type and status on each compact task", async () => {
+    await createTask(app, repoDir);
+    const res = await app.inject({ method: "GET", url: repoUrl(repoDir, "/api/tasks") });
+    expect(res.statusCode).toBe(200);
+    const tasks = res.json<{ id: string; subtasks: { type: string; status: string }[] }[]>();
+    const first = tasks.at(0);
+    expect(Array.isArray(first?.subtasks)).toBe(true);
+    // stub workflow has 2 steps → 2 subtasks seeded
+    expect(first?.subtasks).toHaveLength(2);
+    expect(first?.subtasks[0]).toHaveProperty("type");
+    expect(first?.subtasks[0]).toHaveProperty("status");
+  });
 });
 
 // ---------------------------------------------------------------------------

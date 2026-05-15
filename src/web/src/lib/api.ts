@@ -27,6 +27,11 @@ export class NoActiveRepoError extends Error {
 
 // Compact task shape returned by GET /api/tasks.
 // Defined here (not in store) so the import graph stays acyclic: store → api, never api → store.
+export interface CompactTaskSubtask {
+  type: string;
+  status: "pending" | "in-progress" | "done" | "blocked" | "failed" | "skipped";
+}
+
 export interface CompactTask {
   id: string;
   title: string;
@@ -37,6 +42,8 @@ export interface CompactTask {
   workflow_id: string;
   derived_status: "backlog" | "active" | "blocked" | "done";
   created_at: string;
+  /** Minimal subtask summary for WorkflowStrip rendering without a full task fetch. */
+  subtasks: CompactTaskSubtask[];
 }
 
 // Full task shape (for detail view — S10c adds more)
