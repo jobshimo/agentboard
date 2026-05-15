@@ -40,7 +40,9 @@ export class BroadcastManager {
     return this.#clients.size;
   }
 
-  readonly listener = (event: InsertedEvent): void => {
+  // S5: signature extended with repoRoot; used in S6 for per-repo scoping.
+  // For now (before S6), broadcasts to all clients regardless of repo.
+  readonly listener = (event: InsertedEvent, _repoRoot: string): void => {
     const message = JSON.stringify(toPayload(event));
     for (const client of this.#clients) {
       try {

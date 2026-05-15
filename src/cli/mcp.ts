@@ -18,7 +18,9 @@ import { getDbForRepo, normalizeRepoPath, closeAllDbs } from "../db/connection.j
 import { ActivationState, buildMcpServer } from "../mcp/activation.js";
 import { WaiterRegistry } from "../events/wait.js";
 import { BroadcastManager } from "../server/broadcaster.js";
+import { notifyDaemon } from "../mcp/notify-daemon.js";
 import type { McpServices } from "../mcp/tools/types.js";
+import type { EventListener } from "../events/insert.js";
 
 export interface McpOpts {
   /** Explicit repo path from --repo flag. */
@@ -80,17 +82,23 @@ export async function runMcp(opts: McpOpts): Promise<void> {
   // always-on activation: tools are enabled from startup, no agentboard.activate round-trip needed
   const activationState = new ActivationState("always-on");
 
-  // NOTE: notifyDaemon hook is wired in S5.
-  // For now eventHooks.listeners is empty — DB is always authoritative.
   const broadcaster = new BroadcastManager();
   const waiters = new WaiterRegistry();
+
+  // REQ-M-04: inter-process notify hook — fire-and-forget after each insertEvent
+  // The listener receives (event, repoRoot) per S5 signature change.
+  const notifyHook: EventListener = (_event, eventRepoRoot) => {
+    // Use the MCP process's repoRoot when eventRepoRoot is empty (MCP tools
+    // don't pass repoRoot to insertEvent yet).
+    notifyDaemon(eventRepoRoot || repoRoot, _event.id);
+  };
 
   const services: McpServices = {
     db,
     waiters,
     broadcaster,
     activation: activationState,
-    eventHooks: { listeners: [broadcaster.listener, waiters.listener] },
+    eventHooks: { listeners: [broadcaster.listener, waiters.listener, notifyHook] },
     mintedSessionId: sessionId,
   };
 

@@ -15,7 +15,12 @@ export interface InsertedEvent extends InsertEventOpts {
   id: number;
 }
 
-export type EventListener = (event: InsertedEvent) => void;
+/**
+ * S5: EventListener now receives the repoRoot so the broadcaster can scope
+ * pushes to clients subscribed to that specific repo.
+ * REQ-R-02, REQ-M-04
+ */
+export type EventListener = (event: InsertedEvent, repoRoot: string) => void;
 
 export interface InsertEventHooks {
   listeners?: readonly EventListener[];
@@ -25,6 +30,7 @@ export function insertEvent(
   db: Db,
   opts: InsertEventOpts,
   hooks: InsertEventHooks = {},
+  repoRoot = "",
 ): number {
   if (!isValidEventType(opts.type)) {
     throw new Error(`unknown event type: "${opts.type}"`);
@@ -40,7 +46,7 @@ export function insertEvent(
   const event: InsertedEvent = { ...opts, id };
 
   for (const listener of hooks.listeners ?? []) {
-    listener(event);
+    listener(event, repoRoot);
   }
 
   return id;

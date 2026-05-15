@@ -51,7 +51,8 @@ export class WaiterRegistry {
     });
   }
 
-  readonly listener: EventListener = (event: InsertedEvent): void => {
+  // S5: _repoRoot added to match new EventListener signature
+  readonly listener: EventListener = (event: InsertedEvent, _repoRoot: string): void => {
     for (const waiter of this.#waiters) {
       if (matchesWaiter(waiter, event)) {
         clearTimeout(waiter.timer);

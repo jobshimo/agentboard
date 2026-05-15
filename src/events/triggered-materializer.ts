@@ -18,7 +18,8 @@ type Db = InstanceType<typeof Database>;
  * Idempotent — materializeTriggeredSubtask returns null if the subtask already exists.
  */
 export function createTriggerMaterializer(db: Db): EventListener {
-  return (event) => {
+  // S5: _repoRoot added to match new EventListener signature
+  return (event, _repoRoot) => {
     if (event.taskId === "_global") return;
 
     const taskRow = db

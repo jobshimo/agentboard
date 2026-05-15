@@ -11,6 +11,7 @@ import { WaiterRegistry } from "../events/wait.js";
 import { ActivationState } from "../mcp/activation.js";
 import { getDbForRepo, normalizeRepoPath, dbCacheHas } from "../db/connection.js";
 import { loadRegistry, debouncedUpsert } from "./registry.js";
+import { z } from "zod";
 import { CONFIG_DEFAULTS } from "../config/defaults.js";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -167,6 +168,60 @@ export function buildApp(opts: AppOpts): FastifyInstance & { broadcaster: Broadc
     }
     const registry = loadRegistry(agbHome);
     reply.send({ repos: registry.repos });
+  });
+
+  // ---------------------------------------------------------------------------
+  // POST /internal/notify — loopback-only inter-process notification
+  // Called by the STDIO MCP process after insertEvent to push to WS clients.
+  // REQ-M-04, REQ-R-04, REQ-D-05
+  // ---------------------------------------------------------------------------
+  const NotifyBody = z.object({
+    repo: z.string(),
+    event_id: z.number().int(),
+  });
+
+  app.post("/internal/notify", async (req, reply) => {
+    // Loopback guard: only 127.0.0.1 or ::1 allowed
+    const ip = req.ip;
+    if (ip !== "127.0.0.1" && ip !== "::1" && ip !== "::ffff:127.0.0.1") {
+      return reply.status(403).send({ error: "forbidden", hint: "loopback only" });
+    }
+
+    // Optional shared secret (REQ-D-05)
+    const envSecret = process.env["AGENTBOARD_NOTIFY_SECRET"];
+    if (envSecret) {
+      const headerSecret = req.headers["x-agentboard-secret"];
+      if (headerSecret !== envSecret) {
+        return reply.status(403).send({ error: "forbidden", hint: "invalid secret" });
+      }
+    }
+
+    const parsed = NotifyBody.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: "bad_request" });
+    }
+
+    const { repo, event_id } = parsed.data;
+    const normalizedRepo = normalizeRepoPath(repo);
+
+    // Fetch event from DB
+    const db = getDbForRepo(normalizedRepo);
+    const row = db
+      .prepare(`SELECT id, task_id, type, payload, origin FROM events WHERE id = ?`)
+      .get(event_id) as { id: number; task_id: string; type: string; payload: string; origin: string } | undefined;
+
+    if (row) {
+      const event = {
+        id: row.id,
+        taskId: row.task_id,
+        type: row.type as import("../events/types.js").EventType,
+        payload: JSON.parse(row.payload) as Record<string, unknown>,
+        origin: row.origin as import("../events/insert.js").InsertedEvent["origin"],
+      };
+      broadcaster.listener(event, normalizedRepo);
+    }
+
+    return reply.status(204).send();
   });
 
   // registerRestRoutes reads req.db from the decorated request (no db param).

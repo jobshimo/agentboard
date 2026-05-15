@@ -280,7 +280,7 @@ function registerTaskRoutes(app: FastifyInstance, broadcaster: BroadcastManager,
       type: "comment_added",
       payload: { body: parsed.data.body },
       origin: "human",
-    }, hooks);
+    }, hooks, req.repoRoot);
 
     const result = getEntries(req.db, id);
     const entries = result.type === "entries" ? result.entries : [];
@@ -308,7 +308,7 @@ function registerTaskRoutes(app: FastifyInstance, broadcaster: BroadcastManager,
       type: "custom_subtask_added",
       payload: { subtask_id: subtask.id, label },
       origin: "human",
-    }, hooks);
+    }, hooks, req.repoRoot);
 
     reply.status(201).send(toSubtaskResponse(subtask));
   });
@@ -370,7 +370,7 @@ function registerSubtaskRoutes(app: FastifyInstance, broadcaster: BroadcastManag
       const transition = applyStatusTransition(req.db, id, current.status, status, note);
       updated = transition.updatedRow;
       for (const ev of transition.events) {
-        insertEvent(req.db, { taskId: current.task_id, type: ev.type, payload: ev.payload, origin: "human" }, hooks);
+        insertEvent(req.db, { taskId: current.task_id, type: ev.type, payload: ev.payload, origin: "human" }, hooks, req.repoRoot);
       }
     } else {
       updated = applySubtaskUpdate(req.db, id, { note });
@@ -379,7 +379,7 @@ function registerSubtaskRoutes(app: FastifyInstance, broadcaster: BroadcastManag
         type: "subtask_updated",
         payload: { task_id: current.task_id, subtask_id: id, field: "note", value: note },
         origin: "human",
-      }, hooks);
+      }, hooks, req.repoRoot);
     }
 
     reply.send(toSubtaskResponse(updated));
