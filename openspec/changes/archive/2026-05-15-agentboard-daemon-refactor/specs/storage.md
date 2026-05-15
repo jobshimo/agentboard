@@ -1,35 +1,42 @@
-# Storage and Persistence Specification
+# Delta Spec: Storage and Persistence
 
-## Purpose
+Delta against `openspec/specs/storage.md`
 
-Defines the canonical data store, per-repo isolation, derived views, snapshot export, and write-safety guarantees for `agentboard`.
+---
+
+## Changes Summary
+
+### Added
+- Per-repo DB cache: `Map<string, Db>` in the daemon process, keyed by normalized absolute repo path.
+- Path normalization rule: `path.resolve()` + `.toLowerCase()` on Windows.
+- Per-request DB injection: daemon reads `?repo=<abs-path>` query parameter and decorates `req.db` and `req.repoRoot` before any route handler runs.
+- Missing `?repo` → HTTP 400 rule.
+- New file: `~/.agentboard/daemon.json` — repo registry. Schema, read/write semantics, debounce, and recovery behavior specified.
+- DB cache eviction on daemon shutdown.
+- WAL safety for the two-process model (STDIO MCP + daemon sharing the same file).
+
+### Modified
+- "Per-Repo Isolation" requirement: previously described as two independent server instances; now a single daemon serves multiple repos via per-request routing.
+- "Server starts with no existing database" scenario: now triggered on first request for a repo, not at daemon startup.
+
+### Removed
+- Module-level singleton `_db` — replaced by the per-repo cache map.
+- `process.cwd()` as the implicit repo resolution mechanism for REST requests.
+
+### Unchanged
+- `<repo>/.agentboard/db.sqlite` location.
+- SQLite WAL mode requirement.
+- Schema (tables, columns, migrations).
+- Markdown derived view endpoint.
+- `agentboard export` snapshot command.
+
+Cross-references: `launcher.md` delta (REQ-L-01, per-repo initialization on-demand), `daemon.md` delta (REQ-D-02, DB cache lifecycle), `mcp-surface.md` delta (REQ-M-03, STDIO process DB binding), `realtime-ui.md` delta (REQ-R-01, `?repo=` on all requests).
 
 ---
 
 ## Requirements
 
-### Requirement: SQLite as Canonical Store
-
-The system MUST use SQLite databases at `<repo>/.agentboard/db.sqlite` as the one authoritative source of truth for all task, subtask, workflow snapshot, event, and session data. Each repo has its own database file.
-
-No other file format is canonical. Markdown and JSON exports are derived views only.
-
-#### Scenario: Daemon receives first request for a repo
-
-- GIVEN a repo with no `.agentboard/` directory
-- WHEN the daemon receives the first request with `?repo=<path>`
-- THEN the daemon MUST create `.agentboard/db.sqlite` and apply all migrations before responding to the request
-
-#### Scenario: STDIO process opens repo-scoped database
-
-- GIVEN `agentboard mcp` starts with `AGENTBOARD_REPO=/projects/foo`
-- WHEN the process initializes
-- THEN it MUST open `<repo>/.agentboard/db.sqlite` if it exists, or create it and apply migrations if it does not
-- AND it MUST NOT access any other repo's database
-
----
-
-### Requirement: Per-Repo DB Cache (Daemon)
+### REQ-S-01: Per-Repo DB Cache (Daemon)
 
 The daemon process MUST maintain an in-memory cache of open `Database` instances, one per distinct repo, implemented as a `Map<string, Db>` keyed by the normalized absolute repo path.
 
@@ -80,7 +87,7 @@ Cache entries MUST remain open until the daemon shuts down. There is no idle evi
 
 ---
 
-### Requirement: Per-Request DB Injection
+### REQ-S-02: Per-Request DB Injection
 
 The daemon MUST inspect every incoming HTTP request for the `repo` query parameter before any route handler executes. This MUST be implemented as a request lifecycle hook (e.g. Fastify `onRequest`).
 
@@ -116,7 +123,7 @@ Internal endpoints (e.g. `POST /internal/notify`) are exempt from this requireme
 
 ---
 
-### Requirement: Repo Registry File (`~/.agentboard/daemon.json`)
+### REQ-S-03: Repo Registry File (`~/.agentboard/daemon.json`)
 
 The daemon MUST maintain a registry of known repos at `~/.agentboard/daemon.json`.
 
@@ -183,60 +190,7 @@ Eviction: repos are never removed from `daemon.json` automatically. The registry
 
 ---
 
-### Requirement: Per-Repo Isolation
-
-Each repo MUST have its own `.agentboard/db.sqlite`. Data from one repo MUST NOT be readable or writable by a server instance started in a different repo.
-
-#### Scenario: Two repos running concurrently
-
-- GIVEN repo A at `/projects/foo` and repo B at `/projects/bar`, each with their own `.agentboard/db.sqlite`
-- WHEN two server instances are started independently (one per repo)
-- THEN data written in repo A MUST NOT appear in repo B and vice versa
-
----
-
-### Requirement: Markdown as Derived View
-
-The system MUST expose a `GET /api/tasks/:id/markdown` endpoint that renders a task (discussion + subtask list) as a `.md` file on demand.
-
-Markdown is NEVER a source of truth. It MUST be generated from the database at request time.
-
-#### Scenario: Client requests markdown for an existing task
-
-- GIVEN a task with id `T1` that has a discussion and three subtasks
-- WHEN a client calls `GET /api/tasks/T1/markdown`
-- THEN the response MUST be a valid Markdown document containing the task title, discussion thread, and subtask list with their current states
-
-#### Scenario: Client requests markdown for a non-existent task
-
-- GIVEN no task with id `T99` exists in the database
-- WHEN a client calls `GET /api/tasks/T99/markdown`
-- THEN the server MUST return HTTP 404
-
----
-
-### Requirement: Export Snapshot
-
-The system MUST support an `agentboard export` command that dumps the current board state to `.agentboard/snapshot/` as a tree of `.md` files.
-
-`db.sqlite` MUST be listed in `.gitignore`. The snapshot directory is the git-committable artifact.
-
-#### Scenario: Export on a populated board
-
-- GIVEN a board with two tasks (T1 referenced, T2 local), each with subtasks
-- WHEN the user runs `agentboard export`
-- THEN `.agentboard/snapshot/` MUST contain one `.md` file per task, each reflecting current state
-- AND existing snapshot files MUST be overwritten, not appended
-
-#### Scenario: Export on an empty board
-
-- GIVEN a board with no tasks
-- WHEN the user runs `agentboard export`
-- THEN `.agentboard/snapshot/` MUST be created (or emptied) and the command MUST exit successfully with zero files written
-
----
-
-### Requirement: Two-Process WAL Safety
+### REQ-S-04: Two-Process WAL Safety
 
 The `<repo>/.agentboard/db.sqlite` file MAY be open simultaneously by:
 - The daemon process (via the per-repo cache).
@@ -264,7 +218,7 @@ No additional locking beyond SQLite WAL is required in v1. WAL mode is sufficien
 
 ---
 
-### Requirement: DB Cache Eviction on Shutdown
+### REQ-S-05: DB Cache Eviction on Shutdown
 
 When the daemon receives SIGTERM or SIGINT, it MUST close all open `Database` instances in the cache before the process exits. Incomplete writes at shutdown time are handled by SQLite WAL recovery on next open.
 
@@ -274,3 +228,9 @@ When the daemon receives SIGTERM or SIGINT, it MUST close all open `Database` in
 - WHEN `agentboard stop` sends SIGTERM
 - THEN the daemon MUST call `.close()` on all cached `Database` instances
 - AND MUST exit cleanly with code 0
+
+---
+
+## Open Questions
+
+None.

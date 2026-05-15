@@ -1,18 +1,43 @@
-# Realtime UI Contract Specification
+# Delta Spec: Realtime UI Contract
 
-## Purpose
+Delta against `openspec/specs/realtime-ui.md`
 
-Defines the WebSocket push contract between the server and the browser UI: what triggers pushes, what the payload contains, and the expected client behavior.
+---
 
-Note: UI visual layout, component structure, and design language are delegated to the external design agent (BRIEF-DESIGN.md). This spec defines the server-side push contract and the minimum required browser behavior only.
+## Changes Summary
+
+### Added
+- `?repo=<encoded-abs-path>` required on every REST request and WebSocket connect URL.
+- Repo-scoped broadcasting: WS clients on repo A do not receive events from repo B.
+- On-demand repo switching in the SPA: WS connection torn down and reopened with the new repo param.
+- `POST /internal/notify` endpoint on the daemon (loopback-only): payload, routing, and broadcast semantics specified.
+- `GET /api/daemon/repos` endpoint: supplies the repo list to the SPA repo selector.
+- SPA repo selector behavior: initialization from `localStorage`, TopBar dropdown, WS rebinding on change.
+- `activeRepo` persistence in `localStorage`.
+
+### Modified
+- WebSocket connection lifecycle: now requires `?repo=` on connect; server MUST reject WS upgrades without a valid `?repo=` param.
+- Broadcast scope: previously global (all connected clients); now scoped per repo.
+
+### Removed
+- Implicit global broadcast (all clients receive all events regardless of repo).
+
+### Unchanged
+- WebSocket push-on-DB-change requirement.
+- Push message shape (`{ event, task_id, entity_ids }`).
+- Event types that trigger pushes.
+- `agentboard.notify_human` push behavior.
+- Automatic browser reconnection on WS drop.
+
+Cross-references: `launcher.md` delta (REQ-L-01, daemon serves all repos), `storage.md` delta (REQ-S-02, per-request DB injection, REQ-S-03, repo registry), `daemon.md` delta (REQ-D-04, `/api/daemon/repos`; REQ-D-05, `/internal/notify`).
 
 ---
 
 ## Requirements
 
-### Requirement: `?repo=` on All REST Requests and WS Connect
+### REQ-R-01: `?repo=` on All REST Requests and WS Connect
 
-Every HTTP request sent by the SPA to the daemon MUST include a `?repo=<url-encoded-absolute-path>` query parameter. The daemon enforces this via the `onRequest` hook described in `storage.md` requirement Per-Request DB Injection.
+Every HTTP request sent by the SPA to the daemon MUST include a `?repo=<url-encoded-absolute-path>` query parameter. The daemon enforces this via the `onRequest` hook described in `storage.md` delta REQ-S-02.
 
 Every WebSocket connection upgrade request MUST also include `?repo=<url-encoded-absolute-path>` in the upgrade URL. The daemon MUST reject WebSocket upgrades that lack a valid `?repo=` parameter with HTTP 400.
 
@@ -41,11 +66,11 @@ The SPA MUST treat a missing or invalid `?repo=` response as an application erro
 
 ---
 
-### Requirement: Repo-Scoped Broadcasting
+### REQ-R-02: Repo-Scoped Broadcasting
 
 The daemon's broadcast manager MUST maintain separate subscriber sets, one per active repo. A push event generated for repo A MUST be delivered only to WS clients that connected with `?repo=<repo-A-path>`.
 
-When `POST /internal/notify` is received (see REQ-R-04 below), the daemon MUST look up the event by `event_id` in the repo's database and broadcast to subscribers of that repo only.
+When `POST /internal/notify` is received (see REQ-R-04), the daemon MUST look up the event by `event_id` in the repo's database and broadcast to subscribers of that repo only.
 
 When the daemon itself generates an event (e.g. from a direct REST write by the human via the SPA), it MUST broadcast to the corresponding repo's subscriber set only.
 
@@ -66,76 +91,7 @@ When the daemon itself generates an event (e.g. from a direct REST write by the 
 
 ---
 
-### Requirement: WebSocket Push on DB Change
-
-The server MUST push a notification to connected browser clients scoped to the repo whenever the database state changes in a way that affects the board or task detail views. The push is a signal — not a full data payload. The browser MUST re-fetch the affected entity lazily.
-
-#### Scenario: Agent updates a subtask
-
-- GIVEN a browser has an open WebSocket connection to `/projects/foo` and is viewing the board
-- WHEN the agent calls `subtask.update(S1, status: "done")` in `/projects/foo`
-- THEN the server MUST push a notification to browsers connected to `/projects/foo` only
-- AND the browser MUST re-fetch the relevant task data to update its view
-
-#### Scenario: Human adds a comment via another browser tab
-
-- GIVEN two browser tabs both connected via WebSocket to the same repo
-- WHEN the human adds a comment in tab A
-- THEN tab B MUST receive a push and update its discussion view without requiring a manual refresh
-
----
-
-### Requirement: Push Message Shape
-
-Each WebSocket push message MUST conform to the following minimum shape:
-
-```
-{
-  "event": "<event_type>",   // string; maps to the event-queue type enum
-  "task_id": "<id>",         // string; the affected task (may be null for global events)
-  "entity_ids": ["<id>"]     // array of affected entity ids (subtask ids, etc.)
-}
-```
-
-The browser uses `entity_ids` to know which entities to re-fetch. Full entity data MUST NOT be embedded in the push message.
-
-#### Scenario: Push message is minimal
-
-- GIVEN a `status_change` event for subtask S1 on task T1
-- WHEN the server pushes the notification
-- THEN the message MUST include `event: "status_change"`, `task_id: "T1"`, and `entity_ids: ["S1"]`
-- AND the message MUST NOT include the full subtask object, discussion content, or workflow snapshot
-
----
-
-### Requirement: Events That MUST Trigger a Push
-
-The following event types MUST trigger a WebSocket push to all connected browser sessions:
-
-| Event Type | Reason |
-|-----------|--------|
-| `comment_added` | Discussion updated; chat thread must refresh |
-| `status_change` | Subtask state changed; card must move or update |
-| `subtask_added` | New subtask visible on task detail |
-| `subtask_updated` | Subtask note or artifact link changed |
-| `custom_subtask_added` | New custom subtask appeared on card |
-| `feedback_added` | Feedback indicator needs updating |
-| `task_completed` | Task moves to done column |
-| `task_blocked` | Task moves to blocked state; badge appears |
-| `agent_notification` | Notification badge and toast must appear |
-
-Events with `origin: agent` and `origin: system` MUST also trigger pushes. Pushes are not limited to human-originated events.
-
-#### Scenario: Agent action updates the board in realtime
-
-- GIVEN the human is viewing the board
-- WHEN the agent calls `task.start(T1)` (which transitions the first subtask to `in-progress`)
-- THEN the server MUST emit a `status_change` event AND push a WebSocket notification
-- AND the board MUST reflect the updated state within the browser's next render cycle after re-fetch
-
----
-
-### Requirement: SPA Repo Selector and Switching
+### REQ-R-03: SPA Repo Selector and Switching
 
 The SPA MUST maintain an `activeRepo` state representing the currently viewed repo. This state MUST be initialized in the following precedence:
 
@@ -186,22 +142,7 @@ The SPA MUST display a repo selector in the TopBar. The selector MUST list repos
 
 ---
 
-### Requirement: Connection Lifecycle
-
-The browser MUST attempt to reconnect automatically if the WebSocket connection drops. The server MUST accept reconnections without requiring a full page reload.
-
-On reconnection, the browser SHOULD re-fetch the current board state to reconcile any changes that occurred while disconnected.
-
-#### Scenario: Server restart while browser is open
-
-- GIVEN the browser has an active WebSocket connection
-- WHEN the server restarts
-- THEN the browser MUST detect the disconnection and attempt reconnection
-- AND upon reconnection MUST re-fetch board state to display any changes
-
----
-
-### Requirement: `POST /internal/notify` Endpoint
+### REQ-R-04: `POST /internal/notify` Endpoint
 
 The daemon MUST expose `POST /internal/notify` bound exclusively to `127.0.0.1` (loopback). This endpoint MUST NOT be reachable from external network interfaces.
 
@@ -262,7 +203,7 @@ Optional shared-secret protection: if the environment variable `AGENTBOARD_NOTIF
 
 ---
 
-### Requirement: `GET /api/daemon/repos` Endpoint
+### REQ-R-05: `GET /api/daemon/repos` Endpoint
 
 The daemon MUST expose `GET /api/daemon/repos` returning the list of known repos from the in-memory registry (backed by `daemon.json`).
 
@@ -293,24 +234,6 @@ The response MUST NOT require a `?repo=` query parameter; this endpoint is about
 
 ---
 
-### Requirement: `agentboard.notify_human` Push
+## Open Questions
 
-When the agent calls `agentboard.notify_human(urgency, text)`, the server MUST:
-1. Insert an `agent_notification` event in the event queue.
-2. Push a WebSocket notification to browsers connected to that repo with `event: "agent_notification"` and the urgency level.
-
-The browser MUST display the notification prominently. The `urgency` field MUST be one of: `info`, `warning`, `blocked`.
-
-#### Scenario: Agent signals human intervention required
-
-- GIVEN the agent has reached a step with `can_agent_complete_alone: false`
-- WHEN the agent calls `agentboard.notify_human("blocked", "Need approval for merge")` in `/projects/foo`
-- THEN a WebSocket push with `urgency: "blocked"` MUST be delivered to browsers connected to `/projects/foo`
-- AND the UI MUST display a notification distinguishable from `info` urgency
-
-#### Scenario: No browsers connected
-
-- GIVEN no browser tab has an active WebSocket connection to `/projects/foo`
-- WHEN the agent calls `agentboard.notify_human("warning", "CI is red")` in that repo
-- THEN the event MUST be persisted in the event queue
-- AND the server MUST NOT error; the notification will be visible when the browser reconnects and re-fetches state
+None.

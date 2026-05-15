@@ -1,16 +1,40 @@
-# Launcher and Distribution Specification
+# Delta Spec: Launcher and Distribution
 
-## Purpose
+Delta against `openspec/specs/launcher.md`
 
-Defines the behavior of `npx @jobshimo/agentboard` as a launcher (not a TUI), its subcommands, flags, first-run experience, and distribution contract.
+---
 
-Note: stdout text, color, and error message formatting are delegated to the external design agent (BRIEF-DESIGN.md §2). This spec defines the behavioral contract only.
+## Changes Summary
+
+### Added
+- Subcommand `agentboard mcp` — STDIO MCP entry point (ephemeral, per-session).
+- Subcommand `agentboard daemon` — explicit alias for the default no-subcommand daemon spawn.
+- Subcommand `agentboard stop` — sends SIGTERM to the running daemon; idempotent.
+- Subcommand `agentboard status` — prints daemon state, exits non-zero if not running.
+- Flag `--repo <path>` on `agentboard mcp` — overrides `AGENTBOARD_REPO`; env var wins.
+- Idempotent spawn protocol for the default no-subcommand path: probe `/api/health` before binding.
+
+### Modified
+- Default no-subcommand behavior: changed from "start a per-cwd server" to "idempotent daemon spawn + open browser to active repo".
+- "Port already in use" behavior: changed from hard error to identity probe; error only if the occupant is NOT an agentboard daemon.
+
+### Removed
+- Implicit `cwd` binding on server start — the server no longer captures `process.cwd()` at startup to scope its database.
+- The MCP HTTP/SSE endpoint is no longer part of the daemon surface (moved to `agentboard mcp` STDIO subcommand).
+
+### Unchanged
+- `agentboard init` subcommand.
+- `agentboard export` subcommand.
+- `--port`, `--no-open`, `--help`, `--version` flags.
+- "Console is a launcher, not a TUI" requirement.
+
+Cross-references: `daemon.md` (spawn protocol, PID file, registry), `mcp-surface.md` (STDIO transport, repo resolution), `storage.md` (per-request DB injection).
 
 ---
 
 ## Requirements
 
-### Requirement: Default Command — Idempotent Daemon Spawn
+### REQ-L-01: Default Command — Idempotent Daemon Spawn
 
 Running `npx @jobshimo/agentboard` (or `agentboard daemon`) with no additional arguments MUST perform an idempotent daemon spawn:
 
@@ -55,9 +79,9 @@ The command MUST NOT start a second daemon if one is already running, regardless
 
 ---
 
-### Requirement: `agentboard daemon` Subcommand
+### REQ-L-02: `agentboard daemon` Subcommand
 
-`agentboard daemon` MUST behave identically to `agentboard` with no subcommand (see previous requirement). It is a named alias for explicit clarity in scripts and documentation.
+`agentboard daemon` MUST behave identically to `agentboard` with no subcommand (see REQ-L-01). It is a named alias for explicit clarity in scripts and documentation.
 
 #### Scenario: Explicit daemon subcommand
 
@@ -67,7 +91,7 @@ The command MUST NOT start a second daemon if one is already running, regardless
 
 ---
 
-### Requirement: `agentboard mcp` Subcommand
+### REQ-L-03: `agentboard mcp` Subcommand
 
 `agentboard mcp` MUST start an MCP server over STDIO (stdin/stdout). It MUST block until stdin closes or the process receives SIGTERM/SIGINT. It MUST NOT start a Fastify server, bind a TCP port, or open a browser.
 
@@ -79,7 +103,7 @@ Repo resolution for `agentboard mcp` follows this precedence (highest to lowest)
 
 The environment variable wins over the flag. When both are set, `AGENTBOARD_REPO` is used and the `--repo` flag is silently ignored.
 
-The STDIO process MUST mint a UUID session ID at startup. This ID is used in place of the SDK's `extra.sessionId` (which is `undefined` over STDIO) to identify the agent session in the database. See `mcp-surface.md` for the session ID protocol.
+The STDIO process MUST mint a UUID session ID at startup. This ID is used in place of the SDK's `extra.sessionId` (which is `undefined` over STDIO) to identify the agent session in the database. See `mcp-surface.md` delta for the session ID protocol.
 
 #### Scenario: Launched by MCP client with `AGENTBOARD_REPO` set
 
@@ -124,7 +148,7 @@ The STDIO process MUST mint a UUID session ID at startup. This ID is used in pla
 
 ---
 
-### Requirement: `agentboard stop` Subcommand
+### REQ-L-04: `agentboard stop` Subcommand
 
 `agentboard stop` MUST attempt a graceful shutdown of a running daemon. If no daemon is running, the command MUST exit zero with an informative message (idempotent). If a daemon is running, the command MUST send it a termination signal and wait up to 3 seconds for the process to exit before reporting success or timeout.
 
@@ -154,7 +178,7 @@ The STDIO process MUST mint a UUID session ID at startup. This ID is used in pla
 
 ---
 
-### Requirement: `agentboard status` Subcommand
+### REQ-L-05: `agentboard status` Subcommand
 
 `agentboard status` MUST report the current daemon state to stdout and exit with code 0 if running, non-zero if not running. The output MUST include:
 
@@ -179,7 +203,7 @@ The STDIO process MUST mint a UUID session ID at startup. This ID is used in pla
 
 ---
 
-### Requirement: `--repo` Flag on `agentboard mcp`
+### REQ-L-06: `--repo` Flag on `agentboard mcp`
 
 The `--repo <path>` flag MUST be accepted by `agentboard mcp`. It MUST be ignored by `agentboard`, `agentboard daemon`, `agentboard stop`, and `agentboard status`. Passing `--repo` to those commands MUST produce an error message and exit non-zero.
 
@@ -192,103 +216,6 @@ The `--repo <path>` flag MUST be accepted by `agentboard mcp`. It MUST be ignore
 
 ---
 
-### Requirement: `agentboard init` Subcommand
+## Open Questions
 
-`agentboard init` MUST copy a selected workflow template from `~/.agentboard/workflows/` into `<repo>/.agentboard/workflow.yaml`. It MUST NOT perform a merge — the copy is verbatim.
-
-If no global workflows directory exists, the command MUST print an error and exit non-zero.
-
-#### Scenario: Init with available global workflows
-
-- GIVEN `~/.agentboard/workflows/feature.yaml` exists
-- WHEN the user runs `agentboard init` in a repo
-- THEN `<repo>/.agentboard/workflow.yaml` MUST be created as a verbatim copy of the selected global template
-- AND the command MUST exit zero
-
-#### Scenario: Init with no global workflows
-
-- GIVEN `~/.agentboard/workflows/` does not exist or is empty
-- WHEN the user runs `agentboard init`
-- THEN the command MUST print an error indicating no workflows are available and MUST exit non-zero
-
-#### Scenario: Existing repo workflow file
-
-- GIVEN `<repo>/.agentboard/workflow.yaml` already exists
-- WHEN the user runs `agentboard init`
-- THEN the command MUST either prompt for confirmation before overwriting OR refuse with an informative message; it MUST NOT silently overwrite
-
----
-
-### Requirement: `agentboard export` Subcommand
-
-`agentboard export` MUST dump the current board state to `.agentboard/snapshot/` as a tree of `.md` files, one per task. It MUST overwrite existing snapshot files.
-
-#### Scenario: Successful export
-
-- GIVEN a board with tasks T1 and T2
-- WHEN the user runs `agentboard export`
-- THEN `.agentboard/snapshot/` MUST contain exactly one `.md` file per task reflecting current state
-- AND the command MUST exit zero and print the output path
-
-#### Scenario: Export on uninitialized repo
-
-- GIVEN no `.agentboard/db.sqlite` exists
-- WHEN the user runs `agentboard export`
-- THEN the command MUST print an error indicating the board is not initialized and MUST exit non-zero
-
----
-
-### Requirement: `--port` Flag
-
-The `--port <n>` flag MUST override the default server port. Applies to the default start command.
-
-#### Scenario: Custom port used
-
-- GIVEN the user runs `npx @jobshimo/agentboard --port 8080`
-- WHEN the server starts
-- THEN it MUST bind to port 8080 and print the correct URLs reflecting that port
-
----
-
-### Requirement: `--no-open` Flag
-
-The `--no-open` flag MUST suppress the automatic browser launch. The server MUST still start and print its URLs.
-
-#### Scenario: Server starts without opening browser
-
-- GIVEN the user runs `npx @jobshimo/agentboard --no-open`
-- WHEN the server starts
-- THEN the browser MUST NOT be opened and the server URLs MUST be printed to stdout
-
----
-
-### Requirement: `--help` and `--version` Flags
-
-`--help` MUST print a usage summary to stdout and exit zero.
-`--version` MUST print the current package version to stdout and exit zero.
-
-#### Scenario: `--help` output
-
-- GIVEN any invocation with `--help`
-- WHEN the command runs
-- THEN a usage summary MUST be printed listing available subcommands and flags, and the process MUST exit zero
-
-#### Scenario: `--version` output
-
-- GIVEN any invocation with `--version`
-- WHEN the command runs
-- THEN the version string (e.g. `1.0.0`) MUST be printed and the process MUST exit zero
-
----
-
-### Requirement: Console Is a Launcher, Not a TUI
-
-The console MUST NOT present interactive menus, prompts, or a curses/TUI interface after startup. All human interaction with the board happens in the web browser. All agent interaction happens via MCP.
-
-Stdout output after server start MUST be minimal: server URL, MCP endpoint URL, and any critical error messages only.
-
-#### Scenario: No interactive prompt after start
-
-- GIVEN the server started successfully
-- WHEN the user's terminal is in the foreground
-- THEN the terminal MUST show the startup output and wait (blocking for SIGINT) with no interactive prompt
+None.
