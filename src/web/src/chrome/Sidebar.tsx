@@ -8,7 +8,7 @@ import { en } from "../i18n/en";
 
 export interface WorkflowSummary {
   id: string;
-  name: string;
+  label: string;
 }
 
 export interface TaskCounts {
@@ -80,7 +80,7 @@ export function Sidebar({
             onClick={() => onSetWorkflowFilter(workflowFilter === wf.id ? null : wf.id)}
           >
             <span className="swatch" style={{ background: wfColor(wf.id) }} />
-            {wf.name}
+            {wf.label}
             <span className="count">{taskCounts.byWorkflow[wf.id] ?? 0}</span>
           </div>
         ))}

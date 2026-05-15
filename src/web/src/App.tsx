@@ -4,19 +4,15 @@
 import { useState, useEffect, useMemo } from "react";
 import { TopBar } from "./chrome/TopBar";
 import { Sidebar } from "./chrome/Sidebar";
-import type { WorkflowSummary, TaskCounts } from "./chrome/Sidebar";
+import type { TaskCounts } from "./chrome/Sidebar";
 import { Router, navigate } from "./router/Router";
-import { useTasks, useWorkflowFilter, useActiveRepo, useAvailableRepos } from "./lib/store";
+import { useTasks, useWorkflowFilter, useActiveRepo, useAvailableRepos, useWorkflows } from "./lib/store";
 import type { ViewName } from "./lib/store";
 import { startWs, closeAndReopen } from "./lib/ws";
 import { getPersistedTheme, persistTheme, toggleTheme, applyThemeClass } from "./lib/theme";
 import type { Theme } from "./lib/theme";
-import { fetchTasks, fetchRepos } from "./lib/api";
+import { fetchTasks, fetchRepos, fetchWorkflows } from "./lib/api";
 import { dispatch } from "./lib/store";
-
-// Workflows are static metadata — the real list comes from GET /api/workflows in S10d.
-// S10a uses an empty placeholder so the sidebar renders without an extra fetch.
-const PLACEHOLDER_WORKFLOWS: WorkflowSummary[] = [];
 
 export function App() {
   const [theme, setTheme] = useState<Theme>(getPersistedTheme);
@@ -25,6 +21,7 @@ export function App() {
   const workflowFilter = useWorkflowFilter();
   const activeRepo = useActiveRepo();
   const availableRepos = useAvailableRepos();
+  const workflows = useWorkflows();
 
   // Apply theme class to body whenever theme changes.
   useEffect(() => {
@@ -48,6 +45,9 @@ export function App() {
           fetchTasks()
             .then((t) => dispatch({ type: "SET_TASKS", tasks: t }))
             .catch(() => { /* server may not be running during dev */ });
+          fetchWorkflows()
+            .then((wfs) => dispatch({ type: "SET_WORKFLOWS", workflows: wfs }))
+            .catch(() => { /* non-fatal: sidebar shows empty until reload */ });
         }
         // If no repos: show empty hint (EmptyBoard handles this via activeRepo === null)
       })
@@ -123,7 +123,7 @@ export function App() {
             onPickView={handleSetView}
             workflowFilter={workflowFilter}
             onSetWorkflowFilter={(f) => dispatch({ type: "SET_WORKFLOW_FILTER", workflowFilter: f })}
-            workflows={PLACEHOLDER_WORKFLOWS}
+            workflows={workflows}
             taskCounts={taskCounts}
           />
           <div style={{ minWidth: 0, position: "relative", overflow: "hidden" }}>
