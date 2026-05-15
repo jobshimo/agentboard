@@ -1,7 +1,15 @@
 import type { FastifyInstance } from "fastify";
 import type Database from "better-sqlite3";
 import { z } from "zod";
-import { createLocal, createReferenced, seedWorkflowSubtasks } from "../domain/task.js";
+import {
+  createLocal,
+  createReferenced,
+  seedWorkflowSubtasks,
+  getTask,
+  getTaskSubtasks,
+  listTasks,
+  type TaskRow,
+} from "../domain/task.js";
 import { appendEntry, getEntries } from "../domain/discussion.js";
 import {
   SUBTASK_STATUSES,
@@ -42,24 +50,6 @@ interface CompactTask {
   ref_source: string | null;
   ref_id: string | null;
   created_at: string;
-}
-
-interface TaskRow {
-  id: string;
-  type: string;
-  title: string;
-  ref_source: string | null;
-  ref_id: string | null;
-  ref_url: string | null;
-  ref_title: string | null;
-  ref_status: string | null;
-  ref_assignee: string | null;
-  workflow_id: string;
-  workflow_snapshot: string;
-  snapshot_taken_at: string | null;
-  derived_status: string;
-  created_at: string;
-  closed_at: string | null;
 }
 
 function toCompactTask(row: TaskRow): CompactTask {
@@ -111,22 +101,6 @@ function toSubtaskResponse(row: SubtaskRow) {
   };
 }
 
-function getTask(db: Db, taskId: string): TaskRow {
-  const row = db
-    .prepare("SELECT * FROM tasks WHERE id = ?")
-    .get(taskId) as TaskRow | undefined;
-  if (!row) throw new NotFoundError("task", taskId);
-  return row;
-}
-
-function getTaskSubtasks(db: Db, taskId: string): SubtaskRow[] {
-  return db
-    .prepare(
-      "SELECT * FROM subtasks WHERE task_id = ? ORDER BY position ASC",
-    )
-    .all(taskId) as SubtaskRow[];
-}
-
 // ---------------------------------------------------------------------------
 // Zod schemas for request validation
 // ---------------------------------------------------------------------------
@@ -174,15 +148,13 @@ const AddFeedbackBody = z.object({
 
 function registerTaskRoutes(app: FastifyInstance, db: Db, hooks: InsertEventHooks): void {
   app.get("/api/tasks", async (_req, reply) => {
-    const rows = db
-      .prepare("SELECT * FROM tasks ORDER BY created_at DESC")
-      .all() as TaskRow[];
-    reply.send(rows.map(toCompactTask));
+    reply.send(listTasks(db).map(toCompactTask));
   });
 
   app.get("/api/tasks/:id", async (req, reply) => {
     const { id } = req.params as { id: string };
     const task = getTask(db, id);
+    if (!task) throw new NotFoundError("task", id);
     const subtasks = getTaskSubtasks(db, id);
     reply.send({
       ...toTaskDetail(task),
@@ -192,7 +164,7 @@ function registerTaskRoutes(app: FastifyInstance, db: Db, hooks: InsertEventHook
 
   app.get("/api/tasks/:id/discussion", async (req, reply) => {
     const { id } = req.params as { id: string };
-    getTask(db, id); // throws NotFoundError if missing
+    if (!getTask(db, id)) throw new NotFoundError("task", id);
     const result = getEntries(db, id);
     reply.send(result);
   });
@@ -200,6 +172,7 @@ function registerTaskRoutes(app: FastifyInstance, db: Db, hooks: InsertEventHook
   app.get("/api/tasks/:id/markdown", async (req, reply) => {
     const { id } = req.params as { id: string };
     const task = getTask(db, id);
+    if (!task) throw new NotFoundError("task", id);
     const subtasks = getTaskSubtasks(db, id);
     const discussionResult = getEntries(db, id);
     const discussion =
@@ -266,6 +239,7 @@ function registerTaskRoutes(app: FastifyInstance, db: Db, hooks: InsertEventHook
     seedWorkflowSubtasks(db, taskId, workflow);
 
     const task = getTask(db, taskId);
+    if (!task) throw new NotFoundError("task", taskId);
     const subtasks = getTaskSubtasks(db, taskId);
     reply.status(201).send({ ...toTaskDetail(task), subtasks: subtasks.map(toSubtaskResponse) });
   });
@@ -278,7 +252,7 @@ function registerTaskRoutes(app: FastifyInstance, db: Db, hooks: InsertEventHook
         parsed.error.issues.map((i) => i.message).join("; "),
       );
     }
-    getTask(db, id); // throws if not found
+    if (!getTask(db, id)) throw new NotFoundError("task", id);
 
     appendEntry(db, id, "human", parsed.data.body);
     insertEvent(db, {
@@ -303,7 +277,7 @@ function registerTaskRoutes(app: FastifyInstance, db: Db, hooks: InsertEventHook
         parsed.error.issues.map((i) => i.message).join("; "),
       );
     }
-    getTask(db, id); // throws if not found
+    if (!getTask(db, id)) throw new NotFoundError("task", id);
 
     const { label, type: subtaskType } = parsed.data;
     const subtask = addCustomSubtask(db, id, { label, type: subtaskType });
@@ -326,7 +300,7 @@ function registerTaskRoutes(app: FastifyInstance, db: Db, hooks: InsertEventHook
         parsed.error.issues.map((i) => i.message).join("; "),
       );
     }
-    getTask(db, id); // throws if not found
+    if (!getTask(db, id)) throw new NotFoundError("task", id);
 
     const { target, text, severity = "info" } = parsed.data;
     const eventId = insertEvent(db, {
@@ -402,9 +376,7 @@ function registerWorkflowRoutes(app: FastifyInstance): void {
 
 function registerExportRoute(app: FastifyInstance, db: Db): void {
   app.post("/api/export", async (_req, reply) => {
-    const tasks = db
-      .prepare("SELECT * FROM tasks ORDER BY created_at DESC")
-      .all() as TaskRow[];
+    const tasks = listTasks(db);
 
     const snapshotDir = join(process.cwd(), ".agentboard", "snapshot");
     mkdirSync(snapshotDir, { recursive: true });

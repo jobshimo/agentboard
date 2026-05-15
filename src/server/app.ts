@@ -69,8 +69,15 @@ export function buildApp(opts: AppOpts): FastifyInstance & { broadcaster: Broadc
   registerRestRoutes(app, opts.db, { listeners: [broadcaster.listener, waiters.listener] });
   registerWsRoute(app, broadcaster);
 
-  // MCP transport: wire the activation state machine and mount on /mcp
-  const { mcpServer } = buildMcpServer(activationState, opts.db);
+  // MCP transport: wire the activation state machine + install real tool handlers, then mount on /mcp
+  const mcpServices = {
+    db: opts.db,
+    waiters,
+    broadcaster,
+    activation: activationState,
+    eventHooks: { listeners: [broadcaster.listener, waiters.listener] },
+  };
+  const { mcpServer } = buildMcpServer(activationState, opts.db, mcpServices);
   registerMcpTransport(app, mcpServer);
 
   return app;

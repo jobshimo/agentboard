@@ -1,8 +1,9 @@
 import type { SubtaskRow } from "../domain/subtask.js";
+import type { TaskRow } from "../domain/task.js";
 
-// Compact shapes are defined by token-economy.md:
-// - task.list returns only the fields needed for a board overview
-// - subtask.update returns only changed fields + confirmation
+// Compact shapes per token-economy.md:
+//   task.list — board overview fields only
+//   subtask.update — changed fields + confirmation only
 
 export interface CompactTask {
   id: string;
@@ -24,17 +25,6 @@ export interface CompactSubtask {
   custom: boolean;
   position: number;
 }
-
-export type TaskRow = {
-  id: string;
-  type: string;
-  title: string;
-  ref_source: string | null;
-  ref_id: string | null;
-  workflow_id: string;
-  derived_status: string;
-  created_at: string;
-};
 
 export function compactTask(row: TaskRow): CompactTask {
   return {

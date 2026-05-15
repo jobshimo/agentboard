@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3";
 import { nextTaskId, nextSubtaskId } from "./ids.js";
-import type { SubtaskStatus } from "./subtask.js";
+import type { SubtaskStatus, SubtaskRow } from "./subtask.js";
 import { isTerminal } from "./subtask.js";
 import type { Workflow } from "./workflow.js";
 
@@ -106,4 +106,70 @@ export function derivedStatus(subtasks: SubtaskStatus[]): DerivedStatus {
   if (subtasks.every((s) => isTerminal(s))) return "done";
 
   return "backlog";
+}
+
+// ---------------------------------------------------------------------------
+// Task row types and query functions
+// ---------------------------------------------------------------------------
+
+export interface TaskRow {
+  id: string;
+  type: string;
+  title: string;
+  ref_source: string | null;
+  ref_id: string | null;
+  ref_url: string | null;
+  ref_title: string | null;
+  ref_status: string | null;
+  ref_assignee: string | null;
+  workflow_id: string;
+  workflow_snapshot: string;
+  snapshot_taken_at: string | null;
+  derived_status: string;
+  created_at: string;
+  closed_at: string | null;
+}
+
+export interface ExternalRef {
+  ref_source: string | null;
+  ref_id: string | null;
+  ref_url: string | null;
+  ref_title: string | null;
+  ref_status: string | null;
+  ref_assignee: string | null;
+}
+
+export function getTask(db: Db, taskId: string): TaskRow | undefined {
+  return db.prepare("SELECT * FROM tasks WHERE id = ?").get(taskId) as TaskRow | undefined;
+}
+
+export type TaskFilter = "backlog" | "active" | "blocked" | "done";
+
+export function listTasks(db: Db, filter?: TaskFilter): TaskRow[] {
+  if (filter) {
+    return db
+      .prepare("SELECT * FROM tasks WHERE derived_status = ? ORDER BY created_at DESC")
+      .all(filter) as TaskRow[];
+  }
+  return db
+    .prepare("SELECT * FROM tasks ORDER BY created_at DESC")
+    .all() as TaskRow[];
+}
+
+export function getTaskSubtasks(db: Db, taskId: string): SubtaskRow[] {
+  return db
+    .prepare("SELECT * FROM subtasks WHERE task_id = ? ORDER BY position ASC")
+    .all(taskId) as SubtaskRow[];
+}
+
+export function closeTask(db: Db, taskId: string): void {
+  db.prepare(
+    "UPDATE tasks SET closed_at = CURRENT_TIMESTAMP, derived_status = 'done' WHERE id = ?",
+  ).run(taskId);
+}
+
+export function getTaskExternalRef(db: Db, taskId: string): ExternalRef | undefined {
+  return db.prepare(
+    "SELECT ref_source, ref_id, ref_url, ref_title, ref_status, ref_assignee FROM tasks WHERE id = ?",
+  ).get(taskId) as ExternalRef | undefined;
 }

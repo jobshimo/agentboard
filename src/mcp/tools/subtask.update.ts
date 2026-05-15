@@ -1,0 +1,62 @@
+import { z } from "zod";
+import { installTool } from "./install.js";
+import { compactSubtask, deltaUpdate } from "../compact.js";
+import { withPiggyback } from "../piggyback.js";
+import {
+  SUBTASK_STATUSES,
+  getSubtask,
+  applySubtaskUpdate,
+  recomputeTaskStatus,
+  validTransitions,
+} from "../../domain/subtask.js";
+import { insertEvent } from "../../events/insert.js";
+import { NotFoundError, StateError } from "../../server/errors.js";
+import type { RegisteredTool } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServices } from "./types.js";
+
+export function installSubtaskUpdateTool(
+  activeTools: ReadonlyMap<string, RegisteredTool>,
+  services: McpServices,
+): void {
+  installTool(activeTools, "subtask.update", {
+    description: "Delta update: changes only the provided fields (status and/or note). Does NOT replace the full subtask.",
+    paramsSchema: {
+      id: z.string().describe("Subtask id"),
+      status: z.enum(SUBTASK_STATUSES).optional().describe("New status. Must be a valid transition from the current status."),
+      note: z.string().optional().describe("Optional note or artifact link to attach"),
+    },
+    callback: async (args, extra) => {
+      const { db, eventHooks } = services;
+
+      const current = getSubtask(db, args.id);
+      if (!current) throw new NotFoundError("subtask", args.id);
+
+      if (args.status !== undefined) {
+        const allowed = validTransitions[current.status] ?? [];
+        if (!allowed.includes(args.status)) {
+          throw new StateError(
+            `Cannot transition subtask ${args.id} from "${current.status}" to "${args.status}"`,
+            `Valid transitions: ${allowed.join(", ") || "none (terminal state)"}`,
+          );
+        }
+      }
+
+      const prevCompact = compactSubtask(current);
+      const updated = applySubtaskUpdate(db, args.id, { status: args.status, note: args.note });
+      const nextCompact = compactSubtask(updated);
+      const delta = deltaUpdate(prevCompact, nextCompact);
+
+      recomputeTaskStatus(db, current.task_id);
+
+      insertEvent(db, {
+        taskId: current.task_id,
+        type: "subtask_updated",
+        payload: { task_id: current.task_id, subtask_id: args.id, ...delta },
+        origin: "agent",
+      }, eventHooks);
+
+      const result = await withPiggyback(db, extra.sessionId, { delta });
+      return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+    },
+  });
+}

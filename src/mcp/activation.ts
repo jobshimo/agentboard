@@ -5,6 +5,8 @@ import {
   type RegisteredTool,
 } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { McpActivationMode } from "../config/schema.js";
+import { installTools } from "./tools/index.js";
+import type { McpServices } from "./tools/types.js";
 
 type Db = InstanceType<typeof Database>;
 
@@ -87,12 +89,14 @@ export interface McpServerBundle {
   activeTools: ReadonlyMap<string, RegisteredTool>;
 }
 
-export function buildMcpServer(state: ActivationState, _db: Db): McpServerBundle {
+export function buildMcpServer(state: ActivationState, db: Db, services?: McpServices): McpServerBundle {
   const mcpServer = new McpServer(
     { name: "agentboard", version: "1.0.0" },
     { capabilities: { tools: {} } },
   );
 
+  // agentboard.activate is always-on — it inserts a session row and enables the active tools.
+  // The real handler is wired here directly since this tool lives outside the 14-stub set.
   mcpServer.registerTool(
     "agentboard.activate",
     {
@@ -102,9 +106,12 @@ export function buildMcpServer(state: ActivationState, _db: Db): McpServerBundle
         "agentboard.poll_events and agentboard.wait_for_event.",
       inputSchema: undefined,
     },
-    () => ({
-      content: [{ type: "text" as const, text: "activate must be invoked via the HTTP transport handler." }],
-    }),
+    () => {
+      const result = state.activate(db);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result) }],
+      };
+    },
   );
 
   const activeTools = new Map<string, RegisteredTool>();
@@ -123,6 +130,11 @@ export function buildMcpServer(state: ActivationState, _db: Db): McpServerBundle
 
   if (state.mode === "lazy" || state.mode === "prompt") {
     setToolsEnabled(activeTools, ACTIVE_TOOL_NAMES, false);
+  }
+
+  // Install real handlers if services were provided (i.e. not in test-only mode)
+  if (services) {
+    installTools(activeTools, services);
   }
 
   return { mcpServer, activeTools };
