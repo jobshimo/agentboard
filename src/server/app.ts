@@ -9,7 +9,8 @@ import { registerWsRoute } from "./ws.js";
 import { BroadcastManager } from "./broadcaster.js";
 import { WaiterRegistry } from "../events/wait.js";
 import { ActivationState } from "../mcp/activation.js";
-import { getDbForRepo, normalizeRepoPath } from "../db/connection.js";
+import { getDbForRepo, normalizeRepoPath, dbCacheHas } from "../db/connection.js";
+import { loadRegistry, debouncedUpsert } from "./registry.js";
 import { CONFIG_DEFAULTS } from "../config/defaults.js";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -125,8 +126,15 @@ export function buildApp(opts: AppOpts): FastifyInstance & { broadcaster: Broadc
     }
 
     const normalizedRepo = normalizeRepoPath(repoParam);
+    const isNewRepo = !dbCacheHas(normalizedRepo);
     req.db = getDbForRepo(normalizedRepo);
     req.repoRoot = normalizedRepo;
+
+    // S3: upsert registry on cache miss (new repo seen for first time)
+    // REQ-S-03 — debounced so rapid parallel requests don't hammer disk
+    if (isNewRepo && opts.agbHome) {
+      debouncedUpsert(opts.agbHome, normalizedRepo);
+    }
   });
 
   // ---------------------------------------------------------------------------
@@ -147,6 +155,18 @@ export function buildApp(opts: AppOpts): FastifyInstance & { broadcaster: Broadc
       pid: process.pid,
       port: listeningPort,
     });
+  });
+
+  // REQ-R-05, REQ-D-04: global endpoint exempt from ?repo= hook
+  // Returns known repos from in-memory registry (or fresh load if first request).
+  app.get("/api/daemon/repos", async (_req, reply) => {
+    const agbHome = opts.agbHome;
+    if (!agbHome) {
+      reply.send({ repos: [] });
+      return;
+    }
+    const registry = loadRegistry(agbHome);
+    reply.send({ repos: registry.repos });
   });
 
   // registerRestRoutes reads req.db from the decorated request (no db param).

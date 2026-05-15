@@ -44,6 +44,15 @@ function applyPragmas(db: Db): void {
 }
 
 /**
+ * Return true if the normalized path already has a cached Database.
+ * Used by the onRequest hook to detect first-time repo visits for registry upsert.
+ */
+export function dbCacheHas(repoRoot: string): boolean {
+  const key = normalizeRepoPath(repoRoot);
+  return dbCache.has(key);
+}
+
+/**
  * Return the cached Database for the given repo root, or create one on cache miss.
  * The key is the normalized path (see normalizeRepoPath).
  *
