@@ -158,7 +158,7 @@ async function main(): Promise<void> {
       // REQ-L-06: --repo flag validated here at parse time (handled in parseArgv)
       // Dynamic import to avoid loading Fastify/ws/MCP deps in non-mcp paths.
       const { runMcp } = await import("./mcp.js");
-      await runMcp({ repo });
+      await runMcp({ repo, agbHome });
       break;
     }
 

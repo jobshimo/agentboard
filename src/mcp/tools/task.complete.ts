@@ -41,7 +41,7 @@ export function installTaskCompleteTool(
         origin: "agent",
       }, eventHooks);
 
-      const result = await withPiggyback(db, extra.sessionId, { ok: true, task_id: args.id });
+      const result = await withPiggyback(db, extra.sessionId, { ok: true, task_id: args.id }, services.agentSeesHumanEvents);
       return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
     },
   });

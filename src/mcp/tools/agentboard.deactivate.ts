@@ -23,7 +23,7 @@ export function installDeactivateTool(
       if (!sessionId) throw new ValidationError("session_id is required for deactivate — call agentboard.activate() first");
 
       // Collect any final events before marking session inactive
-      const result = await withPiggyback(db, sessionId, { ok: true });
+      const result = await withPiggyback(db, sessionId, { ok: true }, services.agentSeesHumanEvents);
       activation.deactivate(sessionId, db);
 
       return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };

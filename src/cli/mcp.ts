@@ -19,12 +19,15 @@ import { ActivationState, buildMcpServer } from "../mcp/activation.js";
 import { WaiterRegistry } from "../events/wait.js";
 import { BroadcastManager } from "../server/broadcaster.js";
 import { notifyDaemon } from "../mcp/notify-daemon.js";
+import { loadConfig } from "../config/load.js";
 import type { McpServices } from "../mcp/tools/types.js";
 import type { EventListener } from "../events/insert.js";
 
 export interface McpOpts {
   /** Explicit repo path from --repo flag. */
   repo: string | null;
+  /** Path to the agentboard home directory (~/.agentboard by default). */
+  agbHome: string;
 }
 
 // mcp.json snippet shown when repo is not configured
@@ -52,6 +55,7 @@ Or pass --repo explicitly:
 export async function runMcp(opts: McpOpts): Promise<void> {
   // REQ-M-03: repo resolution order: AGENTBOARD_REPO env > --repo flag > exit 1
   const repoRaw = process.env["AGENTBOARD_REPO"] ?? opts.repo ?? null;
+  const config = loadConfig(opts.agbHome);
 
   if (!repoRaw) {
     process.stderr.write(MCP_JSON_SNIPPET);
@@ -100,6 +104,7 @@ export async function runMcp(opts: McpOpts): Promise<void> {
     activation: activationState,
     eventHooks: { listeners: [broadcaster.listener, waiters.listener, notifyHook] },
     mintedSessionId: sessionId,
+    agentSeesHumanEvents: config.attention.agentSeesHumanEvents,
   };
 
   const { mcpServer } = buildMcpServer(activationState, db, services);

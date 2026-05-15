@@ -44,7 +44,7 @@ export function installTaskGetTool(
         response.discussion = getEntries(db, args.id);
       }
 
-      const result = await withPiggyback(db, extra.sessionId, response);
+      const result = await withPiggyback(db, extra.sessionId, response, services.agentSeesHumanEvents);
       return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
     },
   });

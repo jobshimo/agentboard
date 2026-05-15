@@ -24,4 +24,10 @@ export interface McpServices {
    * REQ-M-02
    */
   mintedSessionId?: string;
+  /**
+   * When false, human-origin events are filtered from the piggyback bundle
+   * so the agent only sees agent/system events in its pending_events.
+   * Defaults to true (pass all events). Wired from config attention.agent_sees_human_events.
+   */
+  agentSeesHumanEvents: boolean;
 }

@@ -68,7 +68,7 @@ export function installSubtaskUpdateTool(
       const nextCompact = compactSubtask(updated);
       const delta = deltaUpdate(prevCompact, nextCompact);
 
-      const result = await withPiggyback(db, extra.sessionId, { delta });
+      const result = await withPiggyback(db, extra.sessionId, { delta }, services.agentSeesHumanEvents);
       return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
     },
   });

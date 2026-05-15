@@ -110,4 +110,51 @@ describe("withPiggyback", () => {
     expect(result.pending_events).toHaveLength(0);
     expect(result.ok).toBe(true);
   });
+
+  describe("agentSeesHumanEvents flag", () => {
+    it("includes human-origin events when agentSeesHumanEvents is true (default)", async () => {
+      insertEvent(db, {
+        taskId: "T-1",
+        type: "comment_added",
+        payload: { text: "human comment" },
+        origin: "human",
+      });
+
+      const result = await withPiggyback(db, SESSION_ID, { ok: true }, true);
+      expect(result.pending_events).toHaveLength(1);
+      expect(result.pending_events[0]!.origin).toBe("human");
+    });
+
+    it("filters out human-origin events when agentSeesHumanEvents is false", async () => {
+      insertEvent(db, {
+        taskId: "T-1",
+        type: "comment_added",
+        payload: { text: "human comment" },
+        origin: "human",
+      });
+      insertEvent(db, {
+        taskId: "T-1",
+        type: "comment_added",
+        payload: { text: "agent comment" },
+        origin: "agent",
+      });
+
+      const result = await withPiggyback(db, SESSION_ID, { ok: true }, false);
+      expect(result.pending_events).toHaveLength(1);
+      expect(result.pending_events[0]!.origin).toBe("agent");
+    });
+
+    it("preserves agent and system events when agentSeesHumanEvents is false", async () => {
+      insertEvent(db, {
+        taskId: "T-1",
+        type: "comment_added",
+        payload: {},
+        origin: "system",
+      });
+
+      const result = await withPiggyback(db, SESSION_ID, { ok: true }, false);
+      expect(result.pending_events).toHaveLength(1);
+      expect(result.pending_events[0]!.origin).toBe("system");
+    });
+  });
 });

@@ -31,7 +31,7 @@ export function installExternalFetchTool(
       const identifier = (args.ref as string).slice(colonIndex + 1);
       const externalRef = getTaskByRef(db, source, identifier);
       if (!externalRef) throw new NotFoundError("task", args.ref as string);
-      const result = await withPiggyback(db, extra.sessionId, { ref: externalRef });
+      const result = await withPiggyback(db, extra.sessionId, { ref: externalRef }, services.agentSeesHumanEvents);
       return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
     },
   });

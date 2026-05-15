@@ -32,7 +32,7 @@ export function installTaskListTool(
         ).find((s) => !TERMINAL.has(s.status));
         return compactTask(row, active ? { label: active.label, status: active.status } : null);
       });
-      const result = await withPiggyback(db, extra.sessionId, { tasks });
+      const result = await withPiggyback(db, extra.sessionId, { tasks }, services.agentSeesHumanEvents);
       return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
     },
   });

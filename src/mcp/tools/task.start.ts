@@ -56,7 +56,7 @@ export function installTaskStartTool(
       const result = await withPiggyback(db, extra.sessionId ?? services.mintedSessionId, {
         started_subtask: updated.id,
         task_id: args.id,
-      });
+      }, services.agentSeesHumanEvents);
       return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
     },
   });

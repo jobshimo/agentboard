@@ -33,7 +33,7 @@ export function installFeedbackSearchTool(
     callback: async (args, extra) => {
       const { db } = services;
       const entries = searchFeedback(db, args.context, args.limit);
-      const response = await withPiggyback(db, extra.sessionId, { entries });
+      const response = await withPiggyback(db, extra.sessionId, { entries }, services.agentSeesHumanEvents);
       return { content: [{ type: "text" as const, text: JSON.stringify(response) }] };
     },
   });

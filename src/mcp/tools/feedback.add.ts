@@ -30,7 +30,7 @@ export function installFeedbackAddTool(
         origin: "agent",
         hooks: eventHooks,
       });
-      const response = await withPiggyback(db, extra.sessionId, result);
+      const response = await withPiggyback(db, extra.sessionId, result, services.agentSeesHumanEvents);
       return { content: [{ type: "text" as const, text: JSON.stringify(response) }] };
     },
   });
