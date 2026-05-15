@@ -1,6 +1,6 @@
 # agentboard
 
-Local-first task tracking for the human/agent coding loop. One server exposes a Kanban-style web UI for humans and an MCP endpoint for AI agents — both connected to the same SQLite store, updated in realtime.
+Local-first task tracking for the human/agent coding loop. A shared web UI for humans and an MCP STDIO entry point for AI agents — both backed by the same SQLite store per repo, updated in realtime via a global HTTP daemon.
 
 ---
 
@@ -10,58 +10,99 @@ Local-first task tracking for the human/agent coding loop. One server exposes a 
 npx @jobshimo/agentboard
 ```
 
-That is the entire install. No global install required. The server starts at `http://localhost:7733`, opens your browser, and the MCP endpoint is live at `http://localhost:7733/mcp`.
+No global install required. Opens the web UI at `http://localhost:7733`. The daemon stays running globally; any number of agent sessions can talk to it simultaneously.
 
 **Requirements**: Node >= 20.11.
 
 ---
 
-## How it works
+## Two-process architecture
 
-- **One process, three surfaces**: web UI at `:7733`, MCP at `:7733/mcp`, REST/WebSocket for the UI.
-- **Per-repo storage**: each repo has its own `.agentboard/db.sqlite` (gitignored). Tasks belong to the repo that originated them.
-- **Realtime**: when the agent moves a card, the human sees it in the browser immediately via WebSocket push. No polling, no refresh.
-- **MCP lazy by default**: the server exposes a single `agentboard.activate()` tool (~200 tokens). Full tool set unlocks on demand. Call `agentboard.deactivate()` to go quiet.
-- **No external integrations**: the server knows nothing about GitHub, Jira, or Linear. The agent uses `gh`, `jira`, or `linear` CLIs directly and updates the board via MCP tools.
+| Process | Transport | Lifetime | Repo scope |
+|---------|-----------|----------|------------|
+| `agentboard mcp` | STDIO | per agent session | single repo (env or flag) |
+| `agentboard` (daemon) | HTTP :7733 | one per machine | all repos |
 
----
-
-## CLI commands
-
-```
-npx @jobshimo/agentboard            # start server, open browser
-npx @jobshimo/agentboard init       # copy a workflow template into <repo>/.agentboard/
-npx @jobshimo/agentboard export     # dump board state to .agentboard/snapshot/*.md
-npx @jobshimo/agentboard --port 8080
-npx @jobshimo/agentboard --no-open  # start server without opening browser
-npx @jobshimo/agentboard --help
-npx @jobshimo/agentboard --version
-```
-
-`agentboard init` copies the first `.yaml` file from `~/.agentboard/workflows/` into `<repo>/.agentboard/workflow.yaml`. On the first server launch, the bundled `coding-task` workflow is seeded into `~/.agentboard/workflows/` automatically.
-
-`agentboard export` writes one `.md` file per task to `.agentboard/snapshot/`. Commit the snapshot when you want a versioned record; `db.sqlite` itself stays gitignored.
+The daemon handles the web UI, REST API, and WebSocket push. Each `agentboard mcp` process talks to the daemon via a loopback HTTP notify call after inserting events. If the daemon is not running, tool calls still work (DB is authoritative); only WS push to the browser is degraded.
 
 ---
 
-## MCP configuration (Claude Code)
+## MCP configuration (Claude Code, Cursor, etc.)
 
-Add to your `claude_desktop_config.json` or MCP server config:
+Add to your `mcp.json` (Claude Code) or equivalent:
 
 ```json
 {
   "mcpServers": {
     "agentboard": {
       "command": "npx",
-      "args": ["@jobshimo/agentboard", "--no-open"]
+      "args": ["@jobshimo/agentboard", "mcp"],
+      "env": {
+        "AGENTBOARD_REPO": "${workspaceFolder}"
+      }
     }
   }
 }
 ```
 
-The server must already be running (or you can use the above to launch it as an MCP server process). The MCP endpoint is `http://localhost:7733/mcp`.
+This single snippet works in any repo without preflight. The `AGENTBOARD_REPO` environment variable tells the MCP process which repo to scope itself to. Alternatively pass `--repo /absolute/path`.
 
 **Confirmed working hosts**: Claude Code.
+
+---
+
+## CLI commands
+
+```
+npx @jobshimo/agentboard                  # start daemon, open browser
+npx @jobshimo/agentboard daemon           # alias for start
+npx @jobshimo/agentboard mcp              # STDIO MCP (for mcp.json, not manual)
+npx @jobshimo/agentboard mcp --repo /path # explicit repo override
+npx @jobshimo/agentboard stop             # graceful SIGTERM + cleanup
+npx @jobshimo/agentboard status           # print port, PID, repos, uptime
+npx @jobshimo/agentboard init             # copy a workflow template into <repo>/.agentboard/
+npx @jobshimo/agentboard export           # dump board state to .agentboard/snapshot/*.md
+npx @jobshimo/agentboard --port 8080
+npx @jobshimo/agentboard --no-open        # start daemon without opening browser
+npx @jobshimo/agentboard --help
+npx @jobshimo/agentboard --version
+```
+
+`agentboard init` copies the first `.yaml` file from `~/.agentboard/workflows/` into `<repo>/.agentboard/workflow.yaml`. On the first daemon launch, the bundled `coding-task` workflow is seeded into `~/.agentboard/workflows/` automatically.
+
+`agentboard export` writes one `.md` file per task to `.agentboard/snapshot/`. Commit the snapshot when you want a versioned record; `db.sqlite` itself stays gitignored.
+
+---
+
+## How it works
+
+- **Global daemon, per-repo DB**: the daemon (`:7733`) holds a `Map<repoPath, Db>` in memory. Every REST request must carry `?repo=<abs-path>`. The daemon opens and caches the SQLite connection on first access.
+- **STDIO MCP process**: `agentboard mcp` resolves repo from `AGENTBOARD_REPO` env, opens the DB, and connects a `StdioServerTransport`. No Fastify, no WebSocket — cold start in ~200ms.
+- **Realtime**: after each MCP tool call that inserts an event, the STDIO process POSTs a fire-and-forget notify to the daemon (`POST /internal/notify`, loopback only). The daemon re-fetches the event and pushes it to all WS clients subscribed to that repo.
+- **Repo switching in the UI**: the TopBar dropdown shows all repos the daemon has seen. Switching triggers a WS reconnect with `?repo=<new>` and a board re-fetch.
+- **Resilient**: daemon down → tool calls still work (DB authoritative); WS push degraded only.
+
+---
+
+## Lifecycle
+
+```
+agent session start
+  └─ agentboard mcp (STDIO)
+       ├─ resolves AGENTBOARD_REPO
+       ├─ opens ~/.agentboard/db.sqlite (WAL)
+       ├─ mints UUID session ID
+       ├─ connects StdioServerTransport
+       └─ on every insertEvent → POST /internal/notify (fire-and-forget)
+
+daemon (long-lived)
+  ├─ GET  /api/health        → { ok, pid, port, uptime_ms, version }
+  ├─ GET  /api/daemon/repos  → { repos: [{path, lastSeenAt}] }
+  ├─ POST /internal/notify   → loopback only; re-fetches event → WS push
+  ├─ GET  /api/tasks?repo=   → per-repo task list
+  ├─ GET  /ws?repo=          → WebSocket (repo-scoped push)
+  └─ ...all other REST routes carry ?repo=
+```
 
 ---
 
@@ -74,9 +115,23 @@ mcp:
   activation: lazy        # lazy (default) | always-on | prompt
 ```
 
-- `lazy`: one tool visible until the agent calls `agentboard.activate()`.
-- `always-on`: full tool set always exposed.
-- `prompt`: agent asks once per session before activating.
+For STDIO (`agentboard mcp`), the activation mode is always `always-on` — the full tool set is available immediately without calling `agentboard.activate()`.
+
+---
+
+## Troubleshooting
+
+**`agentboard mcp` exits with "repo not initialized"**  
+Run `agentboard init` in the project directory first, then retry.
+
+**`agentboard status` shows "daemon not running"**  
+Run `npx @jobshimo/agentboard` to start the daemon, then retry.
+
+**Port `:7733` occupied by another process**  
+Run `agentboard status` — if ok=true the daemon is ours. If not, `lsof -i :7733` to find the occupying process, then `agentboard --port 8080` to use a different port.
+
+**Tools work but no WS push in browser**  
+The daemon must be running for WS push. Start it with `npx @jobshimo/agentboard` in any terminal.
 
 ---
 
@@ -115,14 +170,12 @@ steps:
 
 ## Not in v1
 
-The following are intentionally out of scope for the current release:
-
 - Multi-user / realtime collaboration between humans.
 - Server-side webhooks for CI, Jira, GitHub, or Linear.
 - Cross-machine sync (each machine has its own DB; use `export` + git for transfer).
 - Mobile UI.
 - Authentication or user accounts.
-- MCP `sampling/createMessage` push (not portable today).
+- Auto-spawn daemon from `agentboard mcp` (starts cold, notifies daemon if running).
 
 ---
 
