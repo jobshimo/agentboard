@@ -13,13 +13,15 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { join, dirname } from "node:path";
 import { createRequire } from "node:module";
+import { getWebBundlePath, hasWebBundle } from "./web-bundle.js";
 
-// CJS package exposes its fastify-plugin-wrapped function on module.exports
-// but also reassigns module.exports.default to the raw function — which makes
-// Node's ESM default import resolve to the unwrapped version. createRequire
-// returns the real module.exports so the plugin metadata stays intact.
+// @fastify/websocket and @fastify/static use module.exports = fp(plugin) but
+// also assign module.exports.default = rawPlugin, which makes Node's ESM
+// default import resolve to the unwrapped raw function. createRequire returns
+// the real module.exports so the fastify-plugin metadata stays intact.
 const requireCjs = createRequire(import.meta.url);
 const fastifyWebsocket = requireCjs("@fastify/websocket") as FastifyPluginCallback;
+const fastifyStatic = requireCjs("@fastify/static") as FastifyPluginCallback;
 
 type Db = InstanceType<typeof Database>;
 
@@ -82,6 +84,15 @@ export function buildApp(opts: AppOpts): FastifyInstance & { broadcaster: Broadc
   app.register(async (instance) => {
     registerWsRoute(instance, broadcaster);
   });
+
+  // Production: serve the built SPA at /. In dev (no dist/web/) this is a no-op
+  // so vite dev:web stays the SPA host and the proxy hits the API/WS on this port.
+  if (hasWebBundle()) {
+    app.register(fastifyStatic, {
+      root: getWebBundlePath(),
+      prefix: "/",
+    });
+  }
 
   // MCP transport: wire the activation state machine + install real tool handlers, then mount on /mcp
   const mcpServices = {

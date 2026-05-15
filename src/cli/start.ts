@@ -5,6 +5,7 @@ import { homedir } from "node:os";
 import { getDb, closeDb } from "../db/connection.js";
 import { buildApp } from "../server/app.js";
 import { resolvePort, PortInUseError } from "../server/port.js";
+import { hasWebBundle } from "../server/web-bundle.js";
 import { loadConfig } from "../config/load.js";
 import { runEventGc } from "../events/gc.js";
 import { runInit } from "./init.js";
@@ -79,8 +80,7 @@ export async function runStart(opts: StartOpts): Promise<void> {
 
   await app.listen({ port: resolvedPort, host: "127.0.0.1" });
 
-  const webBundlePath = join(cwd, "dist", "web", "index.html");
-  const webBundlePresent = existsSync(webBundlePath);
+  const webBundlePresent = hasWebBundle();
 
   printBanner({
     version: getVersion(),
