@@ -1,8 +1,26 @@
 {
   "name": "@jobshimo/agentboard",
   "version": "0.1.0",
-  "description": "Local-first agentboard: task tracking for AI agents via MCP",
-  "private": true,
+  "description": "Local-first task board for the human/agent loop — MCP server, Web UI, and CLI installer for Claude Code, OpenCode, and GitHub Copilot.",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "agent",
+    "task-board",
+    "ai",
+    "claude",
+    "opencode",
+    "copilot",
+    "developer-tools"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jobshimo/agentboard.git"
+  },
+  "bugs": {
+    "url": "https://github.com/jobshimo/agentboard/issues"
+  },
+  "homepage": "https://github.com/jobshimo/agentboard#readme",
   "engines": {
     "node": ">=20.11"
   },
