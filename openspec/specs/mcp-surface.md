@@ -161,16 +161,17 @@ When active, the server MUST expose the following tools. All tool names and beha
 | `task.start` | `(id)` | Moves the first `pending` subtask to `in-progress`. |
 | `task.complete` | `(id)` | Marks the task as done. All subtasks MUST be in terminal state or this MUST fail. |
 | `task.comment` | `(id, text)` | Appends an entry to the task's discussion thread with author `agent`. |
-| `task.add_custom_subtask` | `(id, label, type?)` | Adds a custom subtask marked `custom: true`. |
+| `task.add_custom_subtask` | `(task_id, label, type?)` | Adds a custom subtask marked `custom: true`. |
 | `subtask.update` | `(id, status, note?)` | Delta update: MUST change only the provided fields. MUST NOT replace the full subtask object. |
-| `feedback.add` | `(target, text, severity?)` | Adds retrospective or in-flight feedback. See feedback.md. |
+| `feedback.add` | `(task_id, target, text, severity?)` | Adds retrospective or in-flight feedback. `task_id` is required for event attribution; `target` is the task or subtask id the feedback addresses. See feedback.md. |
+| `feedback.search` | `(context, limit?)` | Searches prior feedback by relevance. `context` accepts `task_id`, `workflow_id`, `task_type`, `terms`, `file_paths`, `include_same_task`. |
+| `external.fetch` | `(ref)` | Returns cached external reference metadata. `ref` format: `<source>:<identifier>` (e.g. `github:org/repo#42`). Never live-fetches. |
 | `agentboard.poll_events` | `(task_id?)` | Non-blocking event poll. See event-queue.md. |
 | `agentboard.wait_for_event` | `(timeout_ms, task_id?, types?)` | Long-poll for events. See event-queue.md. |
 | `agentboard.notify_human` | `(urgency, text)` | Sends a notification to the UI. `urgency` MUST be one of: `info`, `warning`, `blocked`. |
-| `agentboard.activate` | `()` | Activates the full tool set. Always available regardless of state. |
 | `agentboard.deactivate` | `()` | Returns to dormant state. Only available when active. |
 
-The server MUST expose 14 of the above core tools when active (excluding `activate`/`deactivate`). Tool count MUST NOT exceed this number without a spec change, to protect system prompt token budget.
+The always-visible `agentboard.activate()` tool (exposed even in dormant state) is separate from the 14 active tools above. When active, the server exposes exactly these 14 tools. Tool count MUST NOT exceed 14 without a spec change, to protect system prompt token budget.
 
 #### Scenario: `task.get` excludes discussion by default
 
