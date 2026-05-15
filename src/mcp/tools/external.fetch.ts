@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { installTool } from "./install.js";
 import { withPiggyback } from "../piggyback.js";
-import { getTaskExternalRef } from "../../domain/task.js";
-import { NotFoundError } from "../../server/errors.js";
+import { getTaskByRef } from "../../domain/task.js";
+import { NotFoundError, ValidationError } from "../../server/errors.js";
 import type { RegisteredTool } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { McpServices } from "./types.js";
 
@@ -14,13 +14,22 @@ export function installExternalFetchTool(
   services: McpServices,
 ): void {
   installTool(activeTools, "external.fetch", {
-    description: "Returns the cached external reference metadata (ref_source, ref_id, ref_url, etc.) for a task. The server never live-fetches — use gh/jira/linear CLIs for current data.",
+    description: "Returns the cached external reference metadata for a task. Pass ref as '<source>:<identifier>' (e.g. 'github:org/repo#42', 'jira:XYZ-123'). The server never live-fetches — use gh/jira/linear CLIs for current data.",
     paramsSchema: {
-      ref: z.string().describe("Task id whose external ref metadata you want"),
+      ref: z.string().describe("Reference string in '<source>:<identifier>' format, e.g. 'github:org/repo#42'"),
     },
     callback: async (args, extra) => {
       const { db } = services;
-      const externalRef = getTaskExternalRef(db, args.ref as string);
+      const colonIndex = (args.ref as string).indexOf(":");
+      if (colonIndex <= 0) {
+        throw new ValidationError(
+          `Invalid ref format: "${args.ref as string}"`,
+          "Expected '<source>:<identifier>', e.g. 'github:org/repo#42'",
+        );
+      }
+      const source = (args.ref as string).slice(0, colonIndex);
+      const identifier = (args.ref as string).slice(colonIndex + 1);
+      const externalRef = getTaskByRef(db, source, identifier);
       if (!externalRef) throw new NotFoundError("task", args.ref as string);
       const result = await withPiggyback(db, extra.sessionId, { ref: externalRef });
       return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };

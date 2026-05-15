@@ -5,6 +5,11 @@ import type { TaskRow } from "../domain/task.js";
 //   task.list — board overview fields only
 //   subtask.update — changed fields + confirmation only
 
+export interface CurrentSubtaskSummary {
+  label: string | null;
+  status: string;
+}
+
 export interface CompactTask {
   id: string;
   title: string;
@@ -14,6 +19,7 @@ export interface CompactTask {
   ref_source: string | null;
   ref_id: string | null;
   created_at: string;
+  current_subtask: CurrentSubtaskSummary | null;
 }
 
 export interface CompactSubtask {
@@ -26,7 +32,10 @@ export interface CompactSubtask {
   position: number;
 }
 
-export function compactTask(row: TaskRow): CompactTask {
+export function compactTask(
+  row: TaskRow,
+  currentSubtask?: CurrentSubtaskSummary | null,
+): CompactTask {
   return {
     id: row.id,
     title: row.title,
@@ -36,6 +45,7 @@ export function compactTask(row: TaskRow): CompactTask {
     ref_source: row.ref_source,
     ref_id: row.ref_id,
     created_at: row.created_at,
+    current_subtask: currentSubtask ?? null,
   };
 }
 

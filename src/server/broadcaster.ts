@@ -6,9 +6,11 @@ export interface Sendable {
 
 interface BroadcastPayload {
   event: string;
-  task_id: string;
+  task_id: string | null;
   entity_ids: string[];
 }
+
+const GLOBAL_SENTINEL = "_global";
 
 function extractEntityIds(payload: Record<string, unknown>): string[] {
   const candidates = [payload["subtask_id"], payload["entity_id"]];
@@ -18,7 +20,7 @@ function extractEntityIds(payload: Record<string, unknown>): string[] {
 function toPayload(event: InsertedEvent): BroadcastPayload {
   return {
     event: event.type,
-    task_id: event.taskId,
+    task_id: event.taskId === GLOBAL_SENTINEL ? null : event.taskId,
     entity_ids: extractEntityIds(event.payload),
   };
 }

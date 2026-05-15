@@ -74,15 +74,54 @@ export function createLocal(db: Db, opts: TaskCreateOpts): string {
 // Workflow subtask seeding
 // ---------------------------------------------------------------------------
 
-/** Creates the initial workflow-step subtasks for a freshly-created task. */
+/**
+ * Creates the initial workflow-step subtasks for a freshly-created task.
+ * Steps with `triggeredBy` set are NOT materialized here — they are deferred
+ * until the named event arrives (workflows.md §`triggered_by` step deferred creation).
+ */
 export function seedWorkflowSubtasks(db: Db, taskId: string, workflow: Workflow): void {
   const insert = db.prepare(
     `INSERT INTO subtasks (id, task_id, type, step_id, label, status, custom, triggered_by, position)
      VALUES (?, ?, 'workflow', ?, ?, 'pending', 0, ?, ?)`,
   );
-  workflow.steps.forEach((step, i) => {
-    insert.run(nextSubtaskId(db), taskId, step.id, step.label, step.triggeredBy ?? null, i);
-  });
+  let position = 0;
+  for (const step of workflow.steps) {
+    if (step.triggeredBy !== undefined) continue;
+    insert.run(nextSubtaskId(db), taskId, step.id, step.label, null, position);
+    position++;
+  }
+}
+
+/**
+ * Materializes a deferred subtask for a workflow step with `triggered_by` when
+ * the named event arrives. Returns the inserted row, or null if the step does
+ * not exist or was already materialized.
+ */
+export function materializeTriggeredSubtask(
+  db: Db,
+  taskId: string,
+  workflow: Workflow,
+  triggerName: string,
+): SubtaskRow | null {
+  const step = workflow.steps.find((s) => s.triggeredBy === triggerName);
+  if (!step) return null;
+
+  const existing = db
+    .prepare("SELECT id FROM subtasks WHERE task_id = ? AND step_id = ?")
+    .get(taskId, step.id);
+  if (existing) return null;
+
+  const position = (
+    db.prepare("SELECT COUNT(*) AS cnt FROM subtasks WHERE task_id = ?").get(taskId) as { cnt: number }
+  ).cnt;
+
+  const id = nextSubtaskId(db);
+  db.prepare(
+    `INSERT INTO subtasks (id, task_id, type, step_id, label, status, custom, triggered_by, position)
+     VALUES (?, ?, 'workflow', ?, ?, 'pending', 0, ?, ?)`,
+  ).run(id, taskId, step.id, step.label, step.triggeredBy, position);
+
+  return db.prepare("SELECT * FROM subtasks WHERE id = ?").get(id) as SubtaskRow;
 }
 
 // ---------------------------------------------------------------------------
@@ -172,4 +211,14 @@ export function getTaskExternalRef(db: Db, taskId: string): ExternalRef | undefi
   return db.prepare(
     "SELECT ref_source, ref_id, ref_url, ref_title, ref_status, ref_assignee FROM tasks WHERE id = ?",
   ).get(taskId) as ExternalRef | undefined;
+}
+
+/**
+ * Looks up a task by its external reference coordinates (ref_source + ref_id).
+ * Used by external.fetch — agents pass `<source>:<identifier>`, not the local task PK.
+ */
+export function getTaskByRef(db: Db, source: string, refId: string): ExternalRef | undefined {
+  return db.prepare(
+    "SELECT ref_source, ref_id, ref_url, ref_title, ref_status, ref_assignee FROM tasks WHERE ref_source = ? AND ref_id = ?",
+  ).get(source, refId) as ExternalRef | undefined;
 }

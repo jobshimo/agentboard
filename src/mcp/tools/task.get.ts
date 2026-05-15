@@ -3,7 +3,7 @@ import { installTool } from "./install.js";
 import { compactSubtask } from "../compact.js";
 import { withPiggyback } from "../piggyback.js";
 import { getTask, getTaskSubtasks } from "../../domain/task.js";
-import { getEntries } from "../../domain/discussion.js";
+import { getEntries, getAllEntries } from "../../domain/discussion.js";
 import { NotFoundError } from "../../server/errors.js";
 import type { RegisteredTool } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { McpServices } from "./types.js";
@@ -17,6 +17,7 @@ export function installTaskGetTool(
     paramsSchema: {
       id: z.string().describe("Task id (e.g. T-1)"),
       include_discussion: z.boolean().optional().describe("Include discussion thread. Defaults to false."),
+      full_discussion: z.boolean().optional().describe("Return the full discussion thread regardless of size. Use when the summary says to retry with full_discussion: true."),
     },
     callback: async (args, extra) => {
       const { db } = services;
@@ -37,7 +38,9 @@ export function installTaskGetTool(
         subtasks,
       };
 
-      if (args.include_discussion) {
+      if (args.full_discussion) {
+        response.discussion = getAllEntries(db, args.id);
+      } else if (args.include_discussion) {
         response.discussion = getEntries(db, args.id);
       }
 

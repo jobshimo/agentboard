@@ -129,6 +129,18 @@ describe("BroadcastManager", () => {
 
     expect(ws.send).toHaveBeenCalledOnce();
   });
+
+  it("maps '_global' sentinel task_id to null in the wire payload", () => {
+    const manager = new BroadcastManager();
+    const ws = { send: vi.fn(), readyState: 1 };
+    manager.attachClient(ws as Sendable);
+
+    const event = makeEvent({ taskId: "_global", type: "agent_notification", payload: { urgency: "info", text: "hello" } });
+    manager.listener(event);
+
+    const msg = JSON.parse(ws.send.mock.calls[0][0] as string) as { task_id: unknown };
+    expect(msg.task_id).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------

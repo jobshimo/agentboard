@@ -131,6 +131,25 @@ describe("task.list", () => {
     expect(result.pending_events).toHaveLength(0);
   });
 
+  it("includes current_subtask brief (first non-terminal subtask) in compact shape", async () => {
+    const sessionId = seedSession(db);
+    seedTask(db, "T-1");
+    seedSubtask(db, "T-1", "s-1", { status: "in-progress", position: 0 });
+    seedSubtask(db, "T-1", "s-2", { status: "pending", position: 1 });
+    const result = await callTool(activeTools, "task.list", {}, sessionId) as any;
+    const task = result.tasks[0];
+    expect(task.current_subtask).not.toBeNull();
+    expect(task.current_subtask.status).toBe("in-progress");
+  });
+
+  it("returns current_subtask: null when all subtasks are terminal", async () => {
+    const sessionId = seedSession(db);
+    seedTask(db, "T-1");
+    seedSubtask(db, "T-1", "s-1", { status: "done", position: 0 });
+    const result = await callTool(activeTools, "task.list", {}, sessionId) as any;
+    expect(result.tasks[0].current_subtask).toBeNull();
+  });
+
   it("filters by derived_status when filter is provided", async () => {
     const sessionId = seedSession(db);
     seedTask(db, "T-1", { derived_status: "active" });
@@ -182,6 +201,19 @@ describe("task.get", () => {
     db.prepare("INSERT INTO discussion_entries (task_id, author, body) VALUES (?, 'agent', 'hello')").run("T-1");
     const result = await callTool(activeTools, "task.get", { id: "T-1", include_discussion: true }, sessionId) as any;
     expect(result.discussion).toBeDefined();
+  });
+
+  it("includes all discussion entries when full_discussion is true (bypasses threshold)", async () => {
+    const sessionId = seedSession(db);
+    seedTask(db, "T-1");
+    // Insert multiple entries — full_discussion should return them all regardless of count
+    for (let i = 0; i < 3; i++) {
+      db.prepare("INSERT INTO discussion_entries (task_id, author, body) VALUES (?, 'agent', ?)").run("T-1", `entry ${i}`);
+    }
+    const result = await callTool(activeTools, "task.get", { id: "T-1", full_discussion: true }, sessionId) as any;
+    expect(result.discussion).toBeDefined();
+    expect(result.discussion.type).toBe("entries");
+    expect(result.discussion.entries).toHaveLength(3);
   });
 
   it("throws NotFoundError for unknown task", async () => {
@@ -318,6 +350,38 @@ describe("subtask.update", () => {
     expect(row.status).toBe("in-progress");
   });
 
+  it("emits status_change (not subtask_updated) when status changes", async () => {
+    const sessionId = seedSession(db);
+    seedTask(db, "T-1");
+    seedSubtask(db, "T-1", "s-1", { status: "pending" });
+
+    await callTool(activeTools, "subtask.update", { id: "s-1", status: "in-progress" }, sessionId);
+    const events = db.prepare("SELECT type FROM events WHERE task_id = 'T-1'").all() as { type: string }[];
+    expect(events.some((e) => e.type === "status_change")).toBe(true);
+    expect(events.some((e) => e.type === "subtask_updated")).toBe(false);
+  });
+
+  it("emits subtask_updated (not status_change) when only note changes", async () => {
+    const sessionId = seedSession(db);
+    seedTask(db, "T-1");
+    seedSubtask(db, "T-1", "s-1", { status: "in-progress" });
+
+    await callTool(activeTools, "subtask.update", { id: "s-1", note: "sha:abc" }, sessionId);
+    const events = db.prepare("SELECT type FROM events WHERE task_id = 'T-1'").all() as { type: string }[];
+    expect(events.some((e) => e.type === "subtask_updated")).toBe(true);
+    expect(events.some((e) => e.type === "status_change")).toBe(false);
+  });
+
+  it("emits task_completed when the last subtask reaches a terminal state", async () => {
+    const sessionId = seedSession(db);
+    seedTask(db, "T-1");
+    seedSubtask(db, "T-1", "s-1", { status: "in-progress" });
+
+    await callTool(activeTools, "subtask.update", { id: "s-1", status: "done" }, sessionId);
+    const events = db.prepare("SELECT type FROM events WHERE task_id = 'T-1'").all() as { type: string }[];
+    expect(events.some((e) => e.type === "task_completed")).toBe(true);
+  });
+
   it("rejects invalid status transitions", async () => {
     const sessionId = seedSession(db);
     seedTask(db, "T-1");
@@ -433,18 +497,23 @@ describe("feedback.search", () => {
 // ---------------------------------------------------------------------------
 
 describe("external.fetch", () => {
-  it("returns cached ref metadata from the task row", async () => {
+  it("returns cached ref metadata when ref is '<source>:<identifier>'", async () => {
     const sessionId = seedSession(db);
     db.prepare(`INSERT INTO tasks (id, type, title, workflow_id, workflow_snapshot, ref_source, ref_id, ref_url)
       VALUES ('T-1', 'referenced', 'My Issue', 'wf', '{}', 'github', 'org/repo#42', 'https://github.com/org/repo/issues/42')`).run();
-    const result = await callTool(activeTools, "external.fetch", { ref: "T-1" }, sessionId) as any;
+    const result = await callTool(activeTools, "external.fetch", { ref: "github:org/repo#42" }, sessionId) as any;
     expect(result.ref.ref_source).toBe("github");
     expect(result.ref.ref_id).toBe("org/repo#42");
   });
 
-  it("throws NotFoundError for unknown task", async () => {
+  it("throws ValidationError when ref is not in '<source>:<identifier>' format", async () => {
     const sessionId = seedSession(db);
-    await expect(callTool(activeTools, "external.fetch", { ref: "T-999" }, sessionId)).rejects.toThrow("task not found");
+    await expect(callTool(activeTools, "external.fetch", { ref: "T-1" }, sessionId)).rejects.toThrow("Invalid ref format");
+  });
+
+  it("throws NotFoundError when no task matches the ref", async () => {
+    const sessionId = seedSession(db);
+    await expect(callTool(activeTools, "external.fetch", { ref: "github:unknown/repo#999" }, sessionId)).rejects.toThrow("task not found");
   });
 });
 

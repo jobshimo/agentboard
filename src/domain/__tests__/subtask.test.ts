@@ -11,6 +11,8 @@ import {
   getSubtask,
   applySubtaskUpdate,
   recomputeTaskStatus,
+  canStartSubtask,
+  applyStatusTransition,
 } from "../subtask.js";
 import { createLocal } from "../task.js";
 
@@ -225,6 +227,103 @@ describe("applySubtaskUpdate", () => {
     const updated = applySubtaskUpdate(db, inserted.id, { status: "in-progress" });
     expect(updated.note).toBe("first note");
     expect(updated.status).toBe("in-progress");
+  });
+});
+
+describe("canStartSubtask", () => {
+  let db: InstanceType<typeof Database>;
+  beforeEach(() => { db = freshDb(); });
+  afterEach(() => db.close());
+
+  const SNAPSHOT_WITH_BLOCK = JSON.stringify({
+    id: "wf",
+    label: "WF",
+    frozenAt: new Date().toISOString(),
+    steps: [
+      { id: "tests", label: "Tests", canAgentCompleteAlone: true, blocksNext: true },
+      { id: "review", label: "Review", canAgentCompleteAlone: false },
+    ],
+  });
+
+  function makeTaskWithSnapshot(snapshot: string): string {
+    return createLocal(db, { title: "T", workflowId: "wf", workflowSnapshot: snapshot });
+  }
+
+  it("returns true when no blocking steps precede the target", () => {
+    const taskId = makeTaskWithSnapshot(SNAPSHOT_WITH_BLOCK);
+    const s1 = addCustomSubtask(db, taskId, { label: "tests" });
+    db.prepare("UPDATE subtasks SET step_id = 'tests' WHERE id = ?").run(s1.id);
+    expect(canStartSubtask(db, taskId, s1.id)).toBe(true);
+  });
+
+  it("returns false when a prior blocking step is pending", () => {
+    const taskId = makeTaskWithSnapshot(SNAPSHOT_WITH_BLOCK);
+    const s1 = addCustomSubtask(db, taskId, { label: "tests" });
+    db.prepare("UPDATE subtasks SET step_id = 'tests' WHERE id = ?").run(s1.id);
+    const s2 = addCustomSubtask(db, taskId, { label: "review" });
+    db.prepare("UPDATE subtasks SET step_id = 'review' WHERE id = ?").run(s2.id);
+    // s1 (tests) is still pending and has blocksNext — s2 cannot start
+    expect(canStartSubtask(db, taskId, s2.id)).toBe(false);
+  });
+
+  it("returns true when the blocking step is done", () => {
+    const taskId = makeTaskWithSnapshot(SNAPSHOT_WITH_BLOCK);
+    const s1 = addCustomSubtask(db, taskId, { label: "tests" });
+    db.prepare("UPDATE subtasks SET step_id = 'tests', status = 'done' WHERE id = ?").run(s1.id);
+    const s2 = addCustomSubtask(db, taskId, { label: "review" });
+    db.prepare("UPDATE subtasks SET step_id = 'review' WHERE id = ?").run(s2.id);
+    expect(canStartSubtask(db, taskId, s2.id)).toBe(true);
+  });
+
+  it("returns false when the blocking step is failed", () => {
+    const taskId = makeTaskWithSnapshot(SNAPSHOT_WITH_BLOCK);
+    const s1 = addCustomSubtask(db, taskId, { label: "tests" });
+    db.prepare("UPDATE subtasks SET step_id = 'tests', status = 'failed' WHERE id = ?").run(s1.id);
+    const s2 = addCustomSubtask(db, taskId, { label: "review" });
+    db.prepare("UPDATE subtasks SET step_id = 'review' WHERE id = ?").run(s2.id);
+    expect(canStartSubtask(db, taskId, s2.id)).toBe(false);
+  });
+});
+
+describe("applyStatusTransition", () => {
+  let db: InstanceType<typeof Database>;
+  beforeEach(() => { db = freshDb(); });
+  afterEach(() => db.close());
+
+  it("returns a status_change event for a normal transition", () => {
+    const taskId = makeTask(db);
+    const s = addCustomSubtask(db, taskId, { label: "step" });
+    const { events } = applyStatusTransition(db, s.id, "pending", "in-progress");
+    expect(events.some((e) => e.type === "status_change")).toBe(true);
+    const sc = events.find((e) => e.type === "status_change");
+    expect(sc?.payload["from_status"]).toBe("pending");
+    expect(sc?.payload["to_status"]).toBe("in-progress");
+  });
+
+  it("includes task_completed event when all subtasks become terminal", () => {
+    const taskId = makeTask(db);
+    const s = addCustomSubtask(db, taskId, { label: "step" });
+    const { events } = applyStatusTransition(db, s.id, "pending", "done");
+    expect(events.some((e) => e.type === "status_change")).toBe(true);
+    expect(events.some((e) => e.type === "task_completed")).toBe(true);
+  });
+
+  it("includes task_blocked event when task becomes blocked", () => {
+    const taskId = makeTask(db);
+    const s = addCustomSubtask(db, taskId, { label: "step" });
+    applySubtaskUpdate(db, s.id, { status: "in-progress" });
+    recomputeTaskStatus(db, taskId);
+    const { events } = applyStatusTransition(db, s.id, "in-progress", "blocked");
+    expect(events.some((e) => e.type === "status_change")).toBe(true);
+    expect(events.some((e) => e.type === "task_blocked")).toBe(true);
+  });
+
+  it("does not include task_completed when other subtasks are still pending", () => {
+    const taskId = makeTask(db);
+    const s1 = addCustomSubtask(db, taskId, { label: "A" });
+    addCustomSubtask(db, taskId, { label: "B" });
+    const { events } = applyStatusTransition(db, s1.id, "pending", "done");
+    expect(events.some((e) => e.type === "task_completed")).toBe(false);
   });
 });
 

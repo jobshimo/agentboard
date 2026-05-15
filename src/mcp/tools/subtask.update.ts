@@ -6,8 +6,9 @@ import {
   SUBTASK_STATUSES,
   getSubtask,
   applySubtaskUpdate,
-  recomputeTaskStatus,
+  applyStatusTransition,
   validTransitions,
+  canStartSubtask,
 } from "../../domain/subtask.js";
 import { insertEvent } from "../../events/insert.js";
 import { NotFoundError, StateError } from "../../server/errors.js";
@@ -39,21 +40,35 @@ export function installSubtaskUpdateTool(
             `Valid transitions: ${allowed.join(", ") || "none (terminal state)"}`,
           );
         }
+        if (args.status === "in-progress" && !canStartSubtask(db, current.task_id, args.id)) {
+          throw new StateError(
+            `Subtask ${args.id} is blocked by a preceding step with blocks_next: true`,
+            "Complete or skip the blocking step before starting this one",
+          );
+        }
       }
 
       const prevCompact = compactSubtask(current);
-      const updated = applySubtaskUpdate(db, args.id, { status: args.status, note: args.note });
+      let updated;
+      if (args.status !== undefined) {
+        const transition = applyStatusTransition(db, args.id, current.status, args.status);
+        updated = args.note !== undefined
+          ? applySubtaskUpdate(db, args.id, { note: args.note })
+          : transition.updatedRow;
+        for (const ev of transition.events) {
+          insertEvent(db, { taskId: current.task_id, type: ev.type, payload: ev.payload, origin: "agent" }, eventHooks);
+        }
+      } else {
+        updated = applySubtaskUpdate(db, args.id, { note: args.note });
+        insertEvent(db, {
+          taskId: current.task_id,
+          type: "subtask_updated",
+          payload: { task_id: current.task_id, subtask_id: args.id, note: args.note },
+          origin: "agent",
+        }, eventHooks);
+      }
       const nextCompact = compactSubtask(updated);
       const delta = deltaUpdate(prevCompact, nextCompact);
-
-      recomputeTaskStatus(db, current.task_id);
-
-      insertEvent(db, {
-        taskId: current.task_id,
-        type: "subtask_updated",
-        payload: { task_id: current.task_id, subtask_id: args.id, ...delta },
-        origin: "agent",
-      }, eventHooks);
 
       const result = await withPiggyback(db, extra.sessionId, { delta });
       return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };

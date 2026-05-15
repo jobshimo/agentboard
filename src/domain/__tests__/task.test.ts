@@ -6,6 +6,7 @@ import {
   createLocal,
   derivedStatus,
   seedWorkflowSubtasks,
+  materializeTriggeredSubtask,
 } from "../task.js";
 import type { SubtaskStatus } from "../subtask.js";
 import type { Workflow } from "../workflow.js";
@@ -104,11 +105,12 @@ describe("seedWorkflowSubtasks", () => {
     ],
   };
 
-  it("inserts one subtask per workflow step", () => {
+  it("skips steps with triggeredBy — only non-deferred steps are materialized at task start", () => {
     const taskId = createLocal(db, { title: "T", workflowId: "coding-task", workflowSnapshot: "{}" });
     seedWorkflowSubtasks(db, taskId, TWO_STEP_WORKFLOW);
     const rows = db.prepare("SELECT * FROM subtasks WHERE task_id = ? ORDER BY position ASC").all(taskId) as { id: string }[];
-    expect(rows).toHaveLength(2);
+    // "review" step has triggeredBy — should NOT be created yet
+    expect(rows).toHaveLength(1);
   });
 
   it("assigns correct fields — type, step_id, label, status, custom, position", () => {
@@ -123,19 +125,42 @@ describe("seedWorkflowSubtasks", () => {
     expect(rows[0]["position"]).toBe(0);
   });
 
-  it("maps triggered_by from the workflow step", () => {
+  it("seeded non-triggered steps have triggered_by = null", () => {
     const taskId = createLocal(db, { title: "T", workflowId: "coding-task", workflowSnapshot: "{}" });
     seedWorkflowSubtasks(db, taskId, TWO_STEP_WORKFLOW);
     const rows = db.prepare("SELECT * FROM subtasks WHERE task_id = ? ORDER BY position ASC").all(taskId) as Record<string, unknown>[];
     expect(rows[0]["triggered_by"]).toBeNull();
-    expect(rows[1]["triggered_by"]).toBe("pr_comment");
   });
 
-  it("assigns positions in step order starting at 0", () => {
+  it("assigns positions in step order starting at 0 (excluding deferred steps)", () => {
     const taskId = createLocal(db, { title: "T", workflowId: "coding-task", workflowSnapshot: "{}" });
     seedWorkflowSubtasks(db, taskId, TWO_STEP_WORKFLOW);
     const rows = db.prepare("SELECT position FROM subtasks WHERE task_id = ? ORDER BY position ASC").all(taskId) as { position: number }[];
-    expect(rows.map(r => r.position)).toEqual([0, 1]);
+    expect(rows.map(r => r.position)).toEqual([0]);
+  });
+
+  it("materializeTriggeredSubtask creates the step when the event arrives", () => {
+    const taskId = createLocal(db, { title: "T", workflowId: "coding-task", workflowSnapshot: "{}" });
+    seedWorkflowSubtasks(db, taskId, TWO_STEP_WORKFLOW);
+    const result = materializeTriggeredSubtask(db, taskId, TWO_STEP_WORKFLOW, "pr_comment");
+    expect(result).not.toBeNull();
+    expect(result?.step_id).toBe("review");
+    expect(result?.triggered_by).toBe("pr_comment");
+  });
+
+  it("materializeTriggeredSubtask is idempotent — returns null on second call", () => {
+    const taskId = createLocal(db, { title: "T", workflowId: "coding-task", workflowSnapshot: "{}" });
+    seedWorkflowSubtasks(db, taskId, TWO_STEP_WORKFLOW);
+    materializeTriggeredSubtask(db, taskId, TWO_STEP_WORKFLOW, "pr_comment");
+    const second = materializeTriggeredSubtask(db, taskId, TWO_STEP_WORKFLOW, "pr_comment");
+    expect(second).toBeNull();
+  });
+
+  it("materializeTriggeredSubtask returns null for an unknown trigger", () => {
+    const taskId = createLocal(db, { title: "T", workflowId: "coding-task", workflowSnapshot: "{}" });
+    seedWorkflowSubtasks(db, taskId, TWO_STEP_WORKFLOW);
+    const result = materializeTriggeredSubtask(db, taskId, TWO_STEP_WORKFLOW, "ci_failed");
+    expect(result).toBeNull();
   });
 });
 

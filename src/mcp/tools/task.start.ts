@@ -2,7 +2,7 @@ import { z } from "zod";
 import { installTool } from "./install.js";
 import { withPiggyback } from "../piggyback.js";
 import { getTask, getTaskSubtasks } from "../../domain/task.js";
-import { applySubtaskUpdate, validTransitions, recomputeTaskStatus } from "../../domain/subtask.js";
+import { applySubtaskUpdate, validTransitions, recomputeTaskStatus, canStartSubtask } from "../../domain/subtask.js";
 import { insertEvent } from "../../events/insert.js";
 import { NotFoundError, StateError } from "../../server/errors.js";
 import type { RegisteredTool } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -32,6 +32,13 @@ export function installTaskStartTool(
       const allowed = validTransitions[pending.status];
       if (!allowed.includes("in-progress")) {
         throw new StateError(`Cannot transition subtask ${pending.id} to in-progress`);
+      }
+
+      if (!canStartSubtask(db, args.id, pending.id)) {
+        throw new StateError(
+          `Subtask ${pending.id} is blocked by a preceding step with blocks_next: true`,
+          "Complete or skip the blocking step before starting this one",
+        );
       }
 
       const updated = applySubtaskUpdate(db, pending.id, { status: "in-progress" });

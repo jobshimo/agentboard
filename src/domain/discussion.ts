@@ -93,3 +93,35 @@ export function getEntries(
 
   return { type: "entries", entries };
 }
+
+/**
+ * Returns all discussion entries for a task without applying the SUMMARY_THRESHOLD.
+ * Used when the agent explicitly requests the full thread via `full_discussion: true`.
+ */
+export function getAllEntries(db: Db, taskId: string): DiscussionResult {
+  const rows = (
+    db
+      .prepare(
+        "SELECT id, task_id, author, body, tag, created_at FROM discussion_entries WHERE task_id = ? ORDER BY id ASC",
+      )
+      .all(taskId)
+  ) as Array<{
+    id: number;
+    task_id: string;
+    author: DiscussionAuthor;
+    body: string;
+    tag: string | null;
+    created_at: string;
+  }>;
+
+  const entries: DiscussionEntry[] = rows.map((r) => ({
+    id: r.id,
+    taskId: r.task_id,
+    author: r.author,
+    body: r.body,
+    tag: r.tag,
+    createdAt: r.created_at,
+  }));
+
+  return { type: "entries", entries };
+}

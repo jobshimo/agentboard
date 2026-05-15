@@ -69,4 +69,21 @@ describe("runInit", () => {
     closeDb();
     expect(() => runInit(cwd)).not.toThrow();
   });
+
+  it("copies coding-task.yaml into .agentboard/workflows/", () => {
+    const cwd = makeTmpDir();
+    runInit(cwd);
+    expect(existsSync(join(cwd, ".agentboard", "workflows", "coding-task.yaml"))).toBe(true);
+  });
+
+  it("does not clobber an existing workflow file on second init", () => {
+    const cwd = makeTmpDir();
+    runInit(cwd);
+    const dest = join(cwd, ".agentboard", "workflows", "coding-task.yaml");
+    writeFileSync(dest, "# user edits", "utf8");
+    closeDb();
+    runInit(cwd);
+    const content = readFileSync(dest, "utf8");
+    expect(content).toBe("# user edits");
+  });
 });

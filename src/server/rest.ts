@@ -17,7 +17,8 @@ import {
   addCustomSubtask,
   getSubtask,
   applySubtaskUpdate,
-  recomputeTaskStatus,
+  applyStatusTransition,
+  canStartSubtask,
   type SubtaskRow,
 } from "../domain/subtask.js";
 import { insertEvent, type InsertEventHooks } from "../events/insert.js";
@@ -333,18 +334,31 @@ function registerSubtaskRoutes(app: FastifyInstance, db: Db, hooks: InsertEventH
           `Valid transitions from "${current.status}": ${allowed.join(", ") || "none (terminal state)"}`,
         );
       }
+      if (status === "in-progress" && !canStartSubtask(db, current.task_id, id)) {
+        throw new StateError(
+          `Subtask ${id} is blocked by a preceding step with blocks_next: true`,
+          "Complete or skip the blocking step before starting this one",
+        );
+      }
     }
 
-    const updated = applySubtaskUpdate(db, id, { status, note });
-
+    let updated;
     if (status !== undefined) {
+      const transition = applyStatusTransition(db, id, current.status, status);
+      updated = note !== undefined
+        ? applySubtaskUpdate(db, id, { note })
+        : transition.updatedRow;
+      for (const ev of transition.events) {
+        insertEvent(db, { taskId: current.task_id, type: ev.type, payload: ev.payload, origin: "human" }, hooks);
+      }
+    } else {
+      updated = applySubtaskUpdate(db, id, { note });
       insertEvent(db, {
         taskId: current.task_id,
         type: "subtask_updated",
-        payload: { subtask_id: id, status },
+        payload: { subtask_id: id, note },
         origin: "human",
       }, hooks);
-      recomputeTaskStatus(db, current.task_id);
     }
 
     reply.send(toSubtaskResponse(updated));
