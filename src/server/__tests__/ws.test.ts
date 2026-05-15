@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import Database from "better-sqlite3";
-import { runMigrations } from "../../db/migrate.js";
+import { mkdtempSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { buildApp } from "../app.js";
 import { BroadcastManager, type Sendable } from "../broadcaster.js";
 import type { InsertedEvent } from "../../events/insert.js";
-
-type Db = InstanceType<typeof Database>;
+import { getDbForRepo, closeAllDbs } from "../../db/connection.js";
 
 // ---------------------------------------------------------------------------
 // Workflow mocks — same stubs used in rest.test.ts
@@ -30,11 +30,16 @@ vi.mock("../../workflows/load.js", () => ({
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeTestDb(): Db {
-  const db = new Database(":memory:");
-  db.pragma("foreign_keys = ON");
-  runMigrations(db);
-  return db;
+function makeTempRepo(): string {
+  const dir = mkdtempSync(join(tmpdir(), "agb-ws-test-"));
+  getDbForRepo(dir);
+  closeAllDbs();
+  return dir;
+}
+
+function repoUrl(repoDir: string, path: string): string {
+  const sep = path.includes("?") ? "&" : "?";
+  return `${path}${sep}repo=${encodeURIComponent(repoDir)}`;
 }
 
 function makeEvent(overrides: Partial<InsertedEvent> = {}): InsertedEvent {
@@ -150,13 +155,16 @@ describe("BroadcastManager", () => {
 // (Fastify's `inject` cannot complete a 101 Switching Protocols response).
 
 describe("WS integration — POST /api/tasks/:id/comments triggers broadcast", () => {
-  let db: Db;
+  let repoDir: string;
 
-  beforeEach(() => { db = makeTestDb(); });
-  afterEach(async () => { db.close(); });
+  beforeEach(() => { repoDir = makeTempRepo(); });
+  afterEach(async () => {
+    closeAllDbs();
+    rmSync(repoDir, { recursive: true, force: true });
+  });
 
   it("calls the broadcaster listener when a comment is inserted", async () => {
-    const app = buildApp({ db });
+    const app = buildApp({});
     await app.ready();
 
     // Inject a spy client into the broadcaster via the app's broadcaster instance
@@ -173,19 +181,19 @@ describe("WS integration — POST /api/tasks/:id/comments triggers broadcast", (
     // Create a task first
     await app.inject({
       method: "POST",
-      url: "/api/tasks",
+      url: repoUrl(repoDir, "/api/tasks"),
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ title: "Test task", workflow_id: "coding-task" }),
     });
 
-    const taskRes = await app.inject({ method: "GET", url: "/api/tasks" });
+    const taskRes = await app.inject({ method: "GET", url: repoUrl(repoDir, "/api/tasks") });
     const tasks = taskRes.json<Array<{ id: string }>>() ;
     const taskId = tasks[0]!.id;
 
     // Post a comment — should trigger WS broadcast
     await app.inject({
       method: "POST",
-      url: `/api/tasks/${taskId}/comments`,
+      url: repoUrl(repoDir, `/api/tasks/${taskId}/comments`),
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ body: "integration test comment" }),
     });
@@ -200,26 +208,26 @@ describe("WS integration — POST /api/tasks/:id/comments triggers broadcast", (
   });
 
   it("WS broadcast does not interfere with REST response on subtask patch", async () => {
-    const app = buildApp({ db });
+    const app = buildApp({});
     await app.ready();
 
     // Create task + get its first subtask
     await app.inject({
       method: "POST",
-      url: "/api/tasks",
+      url: repoUrl(repoDir, "/api/tasks"),
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ title: "Patch test", workflow_id: "coding-task" }),
     });
 
-    const tasksRes = await app.inject({ method: "GET", url: "/api/tasks" });
+    const tasksRes = await app.inject({ method: "GET", url: repoUrl(repoDir, "/api/tasks") });
     const taskId = (tasksRes.json<Array<{ id: string }>>())[0]!.id;
 
-    const taskFullRes = await app.inject({ method: "GET", url: `/api/tasks/${taskId}` });
+    const taskFullRes = await app.inject({ method: "GET", url: repoUrl(repoDir, `/api/tasks/${taskId}`) });
     const subtaskId = (taskFullRes.json<{ subtasks: Array<{ id: string }> }>()).subtasks[0]!.id;
 
     const patchRes = await app.inject({
       method: "PATCH",
-      url: `/api/subtasks/${subtaskId}`,
+      url: repoUrl(repoDir, `/api/subtasks/${subtaskId}`),
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ status: "in-progress" }),
     });

@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { exec } from "node:child_process";
 import { homedir } from "node:os";
-import { getDb, closeDb } from "../db/connection.js";
+import { closeAllDbs } from "../db/connection.js";
 import { buildApp } from "../server/app.js";
 import { resolvePort, PortInUseError } from "../server/port.js";
 import { hasWebBundle } from "../server/web-bundle.js";
@@ -62,11 +62,11 @@ export async function runStart(opts: StartOpts): Promise<void> {
   const port = opts.port !== 0 ? opts.port : config.server.port;
   const openBrowserEnabled = !opts.noOpen && config.server.openBrowser;
 
-  const db = getDb(cwd);
+  // S1: buildApp no longer accepts a db argument. DB is now resolved per-request
+  // from the ?repo= query param via the onRequest hook.
   const app = buildApp({
-    db,
+    agbHome,
     logger: verbose ? { level: "info" } : false,
-    mcpActivationMode: config.mcp.activation,
   });
 
   let resolvedPort: number;
@@ -104,6 +104,12 @@ export async function runStart(opts: StartOpts): Promise<void> {
   }
   printLine(`  ctrl-c to stop.`);
 
+  // GC uses the cwd DB. After S1, we need to get it from cache since buildApp
+  // no longer returns it. The cwd-based DB is already opened by initDb above.
+  // We obtain it lazily from the cache for GC purposes.
+  const { getDbForRepo } = await import("../db/connection.js");
+  const db = getDbForRepo(cwd);
+
   // Schedule GC every 5 minutes as per design §2.14.
   const gcInterval = setInterval(() => {
     runEventGc(db, {
@@ -115,11 +121,12 @@ export async function runStart(opts: StartOpts): Promise<void> {
   // Keep the interval from preventing clean shutdown on SIGINT.
   gcInterval.unref();
 
-  // Graceful shutdown: close Fastify + SQLite on SIGINT (ctrl-c).
+  // Graceful shutdown: close Fastify + all SQLite instances on SIGINT (ctrl-c).
+  // S2 will add SIGTERM handler; for now SIGINT only.
   process.once("SIGINT", async () => {
     clearInterval(gcInterval);
     await app.close();
-    closeDb();
+    closeAllDbs();
     process.exit(0);
   });
 }

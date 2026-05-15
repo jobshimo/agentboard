@@ -1,36 +1,37 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import Database from "better-sqlite3";
-import { runMigrations } from "../../db/migrate.js";
+import { mkdtempSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { buildApp } from "../app.js";
+import { getDbForRepo, closeAllDbs } from "../../db/connection.js";
 
-type Db = InstanceType<typeof Database>;
-
-function makeTestDb(): Db {
-  const db = new Database(":memory:");
-  db.pragma("foreign_keys = ON");
-  runMigrations(db);
-  return db;
+function makeTempRepo(): string {
+  const dir = mkdtempSync(join(tmpdir(), "agb-build-test-"));
+  getDbForRepo(dir);
+  closeAllDbs();
+  return dir;
 }
 
 describe("buildApp", () => {
-  let db: Db;
+  let repoDir: string;
 
   beforeEach(() => {
-    db = makeTestDb();
+    repoDir = makeTempRepo();
   });
 
   afterEach(() => {
-    db.close();
+    closeAllDbs();
+    rmSync(repoDir, { recursive: true, force: true });
   });
 
   it("instantiates without throwing", async () => {
-    const app = buildApp({ db });
+    const app = buildApp({});
     expect(app).toBeDefined();
     await app.close();
   });
 
   it("returns 200 on GET /api/health", async () => {
-    const app = buildApp({ db });
+    const app = buildApp({});
     const res = await app.inject({ method: "GET", url: "/api/health" });
     expect(res.statusCode).toBe(200);
     const body = res.json<{ ok: boolean }>();
@@ -38,9 +39,12 @@ describe("buildApp", () => {
     await app.close();
   });
 
-  it("returns 404 for unknown routes", async () => {
-    const app = buildApp({ db });
-    const res = await app.inject({ method: "GET", url: "/api/unknown-route" });
+  it("returns 404 for unknown routes (with valid ?repo= to bypass hook)", async () => {
+    const app = buildApp({});
+    const res = await app.inject({
+      method: "GET",
+      url: `/api/unknown-route?repo=${encodeURIComponent(repoDir)}`,
+    });
     expect(res.statusCode).toBe(404);
     await app.close();
   });

@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import Database from "better-sqlite3";
-import { runMigrations } from "../../db/migrate.js";
+import { mkdtempSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { buildApp } from "../app.js";
-
-type Db = InstanceType<typeof Database>;
+import { getDbForRepo, closeAllDbs } from "../../db/connection.js";
 
 // ---------------------------------------------------------------------------
 // Workflow discovery is filesystem-dependent. We stub it for REST tests
@@ -29,24 +29,33 @@ vi.mock("../../workflows/load.js", () => ({
 // Test helpers
 // ---------------------------------------------------------------------------
 
-function makeTestDb(): Db {
-  const db = new Database(":memory:");
-  db.pragma("foreign_keys = ON");
-  runMigrations(db);
-  return db;
+function makeTempRepo(): string {
+  const dir = mkdtempSync(join(tmpdir(), "agb-rest-test-"));
+  // Initialize the DB so .agentboard/db.sqlite exists (required by onRequest hook validation).
+  getDbForRepo(dir);
+  closeAllDbs();
+  return dir;
 }
 
-function buildTestApp(db: Db) {
-  return buildApp({ db });
+function buildTestApp() {
+  return buildApp({});
+}
+
+type TestApp = ReturnType<typeof buildTestApp>;
+
+function repoUrl(repoDir: string, path: string): string {
+  const sep = path.includes("?") ? "&" : "?";
+  return `${path}${sep}repo=${encodeURIComponent(repoDir)}`;
 }
 
 async function createTask(
-  app: Awaited<ReturnType<typeof buildTestApp>>,
+  app: TestApp,
+  repoDir: string,
   body: object = { title: "My task", workflow_id: "coding-task" },
 ) {
   return app.inject({
     method: "POST",
-    url: "/api/tasks",
+    url: repoUrl(repoDir, "/api/tasks"),
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   });
@@ -57,28 +66,29 @@ async function createTask(
 // ---------------------------------------------------------------------------
 
 describe("GET /api/tasks", () => {
-  let db: Db;
-  let app: Awaited<ReturnType<typeof buildTestApp>>;
+  let repoDir: string;
+  let app: TestApp;
 
   beforeEach(() => {
-    db = makeTestDb();
-    app = buildTestApp(db);
+    repoDir = makeTempRepo();
+    app = buildTestApp();
   });
 
   afterEach(async () => {
     await app.close();
-    db.close();
+    closeAllDbs();
+    rmSync(repoDir, { recursive: true, force: true });
   });
 
   it("returns an empty array when no tasks exist", async () => {
-    const res = await app.inject({ method: "GET", url: "/api/tasks" });
+    const res = await app.inject({ method: "GET", url: repoUrl(repoDir, "/api/tasks") });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual([]);
   });
 
   it("returns compact task shape after a task is created", async () => {
-    await createTask(app);
-    const res = await app.inject({ method: "GET", url: "/api/tasks" });
+    await createTask(app, repoDir);
+    const res = await app.inject({ method: "GET", url: repoUrl(repoDir, "/api/tasks") });
     expect(res.statusCode).toBe(200);
     const tasks = res.json<{ id: string; derived_status: string }[]>();
     expect(tasks).toHaveLength(1);
@@ -93,21 +103,22 @@ describe("GET /api/tasks", () => {
 // ---------------------------------------------------------------------------
 
 describe("POST /api/tasks", () => {
-  let db: Db;
-  let app: Awaited<ReturnType<typeof buildTestApp>>;
+  let repoDir: string;
+  let app: TestApp;
 
   beforeEach(() => {
-    db = makeTestDb();
-    app = buildTestApp(db);
+    repoDir = makeTempRepo();
+    app = buildTestApp();
   });
 
   afterEach(async () => {
     await app.close();
-    db.close();
+    closeAllDbs();
+    rmSync(repoDir, { recursive: true, force: true });
   });
 
   it("creates a local task and returns 201 with TaskFull shape", async () => {
-    const res = await createTask(app);
+    const res = await createTask(app, repoDir);
     expect(res.statusCode).toBe(201);
     const body = res.json<{ id: string; title: string; subtasks: unknown[] }>();
     expect(body.id).toMatch(/^T-\d+$/);
@@ -117,7 +128,7 @@ describe("POST /api/tasks", () => {
   });
 
   it("creates a referenced task when ref is provided", async () => {
-    const res = await createTask(app, {
+    const res = await createTask(app, repoDir, {
       title: "Fix bug",
       workflow_id: "coding-task",
       ref: { source: "github", id: "acme/repo#7" },
@@ -132,7 +143,7 @@ describe("POST /api/tasks", () => {
   it("returns 400 when title is missing", async () => {
     const res = await app.inject({
       method: "POST",
-      url: "/api/tasks",
+      url: repoUrl(repoDir, "/api/tasks"),
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ workflow_id: "coding-task" }),
     });
@@ -142,10 +153,9 @@ describe("POST /api/tasks", () => {
   });
 
   it("returns 400 when workflow_id is unknown", async () => {
-    // Override the mock to return no paths for this test
     const res = await app.inject({
       method: "POST",
-      url: "/api/tasks",
+      url: repoUrl(repoDir, "/api/tasks"),
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ title: "t", workflow_id: "nonexistent-wf" }),
     });
@@ -158,24 +168,25 @@ describe("POST /api/tasks", () => {
 // ---------------------------------------------------------------------------
 
 describe("GET /api/tasks/:id", () => {
-  let db: Db;
-  let app: Awaited<ReturnType<typeof buildTestApp>>;
+  let repoDir: string;
+  let app: TestApp;
 
   beforeEach(() => {
-    db = makeTestDb();
-    app = buildTestApp(db);
+    repoDir = makeTempRepo();
+    app = buildTestApp();
   });
 
   afterEach(async () => {
     await app.close();
-    db.close();
+    closeAllDbs();
+    rmSync(repoDir, { recursive: true, force: true });
   });
 
   it("returns task detail with subtasks", async () => {
-    const created = await createTask(app);
+    const created = await createTask(app, repoDir);
     const { id } = created.json<{ id: string }>();
 
-    const res = await app.inject({ method: "GET", url: `/api/tasks/${id}` });
+    const res = await app.inject({ method: "GET", url: repoUrl(repoDir, `/api/tasks/${id}`) });
     expect(res.statusCode).toBe(200);
     const body = res.json<{ id: string; subtasks: { label: string }[] }>();
     expect(body.id).toBe(id);
@@ -183,7 +194,7 @@ describe("GET /api/tasks/:id", () => {
   });
 
   it("returns 404 for a missing task", async () => {
-    const res = await app.inject({ method: "GET", url: "/api/tasks/T-999" });
+    const res = await app.inject({ method: "GET", url: repoUrl(repoDir, "/api/tasks/T-999") });
     expect(res.statusCode).toBe(404);
     const body = res.json<{ error: { code: string } }>();
     expect(body.error.code).toBe("not_found/task");
@@ -195,26 +206,27 @@ describe("GET /api/tasks/:id", () => {
 // ---------------------------------------------------------------------------
 
 describe("GET /api/tasks/:id/discussion", () => {
-  let db: Db;
-  let app: Awaited<ReturnType<typeof buildTestApp>>;
+  let repoDir: string;
+  let app: TestApp;
 
   beforeEach(() => {
-    db = makeTestDb();
-    app = buildTestApp(db);
+    repoDir = makeTempRepo();
+    app = buildTestApp();
   });
 
   afterEach(async () => {
     await app.close();
-    db.close();
+    closeAllDbs();
+    rmSync(repoDir, { recursive: true, force: true });
   });
 
   it("returns entries shape when discussion is empty", async () => {
-    const created = await createTask(app);
+    const created = await createTask(app, repoDir);
     const { id } = created.json<{ id: string }>();
 
     const res = await app.inject({
       method: "GET",
-      url: `/api/tasks/${id}/discussion`,
+      url: repoUrl(repoDir, `/api/tasks/${id}/discussion`),
     });
     expect(res.statusCode).toBe(200);
     const body = res.json<{ type: string; entries: unknown[] }>();
@@ -225,7 +237,7 @@ describe("GET /api/tasks/:id/discussion", () => {
   it("returns 404 for unknown task", async () => {
     const res = await app.inject({
       method: "GET",
-      url: "/api/tasks/T-404/discussion",
+      url: repoUrl(repoDir, "/api/tasks/T-404/discussion"),
     });
     expect(res.statusCode).toBe(404);
   });
@@ -236,26 +248,27 @@ describe("GET /api/tasks/:id/discussion", () => {
 // ---------------------------------------------------------------------------
 
 describe("POST /api/tasks/:id/comments", () => {
-  let db: Db;
-  let app: Awaited<ReturnType<typeof buildTestApp>>;
+  let repoDir: string;
+  let app: TestApp;
 
   beforeEach(() => {
-    db = makeTestDb();
-    app = buildTestApp(db);
+    repoDir = makeTempRepo();
+    app = buildTestApp();
   });
 
   afterEach(async () => {
     await app.close();
-    db.close();
+    closeAllDbs();
+    rmSync(repoDir, { recursive: true, force: true });
   });
 
   it("appends a comment and returns 201 with the entry", async () => {
-    const created = await createTask(app);
+    const created = await createTask(app, repoDir);
     const { id } = created.json<{ id: string }>();
 
     const res = await app.inject({
       method: "POST",
-      url: `/api/tasks/${id}/comments`,
+      url: repoUrl(repoDir, `/api/tasks/${id}/comments`),
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ body: "Looks good!" }),
     });
@@ -266,12 +279,12 @@ describe("POST /api/tasks/:id/comments", () => {
   });
 
   it("returns 400 when body is missing", async () => {
-    const created = await createTask(app);
+    const created = await createTask(app, repoDir);
     const { id } = created.json<{ id: string }>();
 
     const res = await app.inject({
       method: "POST",
-      url: `/api/tasks/${id}/comments`,
+      url: repoUrl(repoDir, `/api/tasks/${id}/comments`),
       headers: { "content-type": "application/json" },
       body: JSON.stringify({}),
     });
@@ -281,7 +294,7 @@ describe("POST /api/tasks/:id/comments", () => {
   it("returns 404 for unknown task", async () => {
     const res = await app.inject({
       method: "POST",
-      url: "/api/tasks/T-999/comments",
+      url: repoUrl(repoDir, "/api/tasks/T-999/comments"),
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ body: "hi" }),
     });
@@ -294,26 +307,27 @@ describe("POST /api/tasks/:id/comments", () => {
 // ---------------------------------------------------------------------------
 
 describe("POST /api/tasks/:id/subtasks", () => {
-  let db: Db;
-  let app: Awaited<ReturnType<typeof buildTestApp>>;
+  let repoDir: string;
+  let app: TestApp;
 
   beforeEach(() => {
-    db = makeTestDb();
-    app = buildTestApp(db);
+    repoDir = makeTempRepo();
+    app = buildTestApp();
   });
 
   afterEach(async () => {
     await app.close();
-    db.close();
+    closeAllDbs();
+    rmSync(repoDir, { recursive: true, force: true });
   });
 
   it("adds a custom subtask and returns 201", async () => {
-    const created = await createTask(app);
+    const created = await createTask(app, repoDir);
     const { id } = created.json<{ id: string }>();
 
     const res = await app.inject({
       method: "POST",
-      url: `/api/tasks/${id}/subtasks`,
+      url: repoUrl(repoDir, `/api/tasks/${id}/subtasks`),
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ label: "Manual review" }),
     });
@@ -325,12 +339,12 @@ describe("POST /api/tasks/:id/subtasks", () => {
   });
 
   it("returns 400 when label is missing", async () => {
-    const created = await createTask(app);
+    const created = await createTask(app, repoDir);
     const { id } = created.json<{ id: string }>();
 
     const res = await app.inject({
       method: "POST",
-      url: `/api/tasks/${id}/subtasks`,
+      url: repoUrl(repoDir, `/api/tasks/${id}/subtasks`),
       headers: { "content-type": "application/json" },
       body: JSON.stringify({}),
     });
@@ -343,21 +357,22 @@ describe("POST /api/tasks/:id/subtasks", () => {
 // ---------------------------------------------------------------------------
 
 describe("PATCH /api/subtasks/:id", () => {
-  let db: Db;
-  let app: Awaited<ReturnType<typeof buildTestApp>>;
+  let repoDir: string;
+  let app: TestApp;
 
   beforeEach(() => {
-    db = makeTestDb();
-    app = buildTestApp(db);
+    repoDir = makeTempRepo();
+    app = buildTestApp();
   });
 
   afterEach(async () => {
     await app.close();
-    db.close();
+    closeAllDbs();
+    rmSync(repoDir, { recursive: true, force: true });
   });
 
   async function getFirstSubtaskId(): Promise<{ taskId: string; subtaskId: string }> {
-    const created = await createTask(app);
+    const created = await createTask(app, repoDir);
     const body = created.json<{ id: string; subtasks: { id: string }[] }>();
     const firstSubtask = body.subtasks.at(0);
     if (!firstSubtask) throw new Error("Expected at least one subtask");
@@ -369,7 +384,7 @@ describe("PATCH /api/subtasks/:id", () => {
 
     const res = await app.inject({
       method: "PATCH",
-      url: `/api/subtasks/${subtaskId}`,
+      url: repoUrl(repoDir, `/api/subtasks/${subtaskId}`),
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ status: "in-progress" }),
     });
@@ -384,7 +399,7 @@ describe("PATCH /api/subtasks/:id", () => {
 
     const res = await app.inject({
       method: "PATCH",
-      url: `/api/subtasks/${subtaskId}`,
+      url: repoUrl(repoDir, `/api/subtasks/${subtaskId}`),
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ note: "sha:abc123" }),
     });
@@ -400,7 +415,7 @@ describe("PATCH /api/subtasks/:id", () => {
     // pending → done is NOT a valid transition; must go pending → in-progress first
     const res = await app.inject({
       method: "PATCH",
-      url: `/api/subtasks/${subtaskId}`,
+      url: repoUrl(repoDir, `/api/subtasks/${subtaskId}`),
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ status: "done" }),
     });
@@ -414,7 +429,7 @@ describe("PATCH /api/subtasks/:id", () => {
 
     const res = await app.inject({
       method: "PATCH",
-      url: `/api/subtasks/${subtaskId}`,
+      url: repoUrl(repoDir, `/api/subtasks/${subtaskId}`),
       headers: { "content-type": "application/json" },
       body: JSON.stringify({}),
     });
@@ -424,7 +439,7 @@ describe("PATCH /api/subtasks/:id", () => {
   it("returns 404 for an unknown subtask id", async () => {
     const res = await app.inject({
       method: "PATCH",
-      url: "/api/subtasks/s-9999",
+      url: repoUrl(repoDir, "/api/subtasks/s-9999"),
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ status: "in-progress" }),
     });
@@ -436,14 +451,14 @@ describe("PATCH /api/subtasks/:id", () => {
 
     await app.inject({
       method: "PATCH",
-      url: `/api/subtasks/${subtaskId}`,
+      url: repoUrl(repoDir, `/api/subtasks/${subtaskId}`),
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ status: "in-progress" }),
     });
 
     const taskRes = await app.inject({
       method: "GET",
-      url: `/api/tasks/${taskId}`,
+      url: repoUrl(repoDir, `/api/tasks/${taskId}`),
     });
     const task = taskRes.json<{ derived_status: string }>();
     expect(task.derived_status).toBe("active");
@@ -455,26 +470,27 @@ describe("PATCH /api/subtasks/:id", () => {
 // ---------------------------------------------------------------------------
 
 describe("POST /api/tasks/:id/feedback", () => {
-  let db: Db;
-  let app: Awaited<ReturnType<typeof buildTestApp>>;
+  let repoDir: string;
+  let app: TestApp;
 
   beforeEach(() => {
-    db = makeTestDb();
-    app = buildTestApp(db);
+    repoDir = makeTempRepo();
+    app = buildTestApp();
   });
 
   afterEach(async () => {
     await app.close();
-    db.close();
+    closeAllDbs();
+    rmSync(repoDir, { recursive: true, force: true });
   });
 
   it("adds feedback and returns {ok, event_id}", async () => {
-    const created = await createTask(app);
+    const created = await createTask(app, repoDir);
     const { id } = created.json<{ id: string }>();
 
     const res = await app.inject({
       method: "POST",
-      url: `/api/tasks/${id}/feedback`,
+      url: repoUrl(repoDir, `/api/tasks/${id}/feedback`),
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         target: id,
@@ -489,12 +505,12 @@ describe("POST /api/tasks/:id/feedback", () => {
   });
 
   it("returns 400 for invalid severity", async () => {
-    const created = await createTask(app);
+    const created = await createTask(app, repoDir);
     const { id } = created.json<{ id: string }>();
 
     const res = await app.inject({
       method: "POST",
-      url: `/api/tasks/${id}/feedback`,
+      url: repoUrl(repoDir, `/api/tasks/${id}/feedback`),
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ target: id, text: "Bad", severity: "urgent" }),
     });
@@ -504,7 +520,7 @@ describe("POST /api/tasks/:id/feedback", () => {
   it("returns 404 for unknown task", async () => {
     const res = await app.inject({
       method: "POST",
-      url: "/api/tasks/T-999/feedback",
+      url: repoUrl(repoDir, "/api/tasks/T-999/feedback"),
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ target: "T-999", text: "oops" }),
     });
@@ -517,21 +533,22 @@ describe("POST /api/tasks/:id/feedback", () => {
 // ---------------------------------------------------------------------------
 
 describe("GET /api/tasks/:id/markdown", () => {
-  let db: Db;
-  let app: Awaited<ReturnType<typeof buildTestApp>>;
+  let repoDir: string;
+  let app: TestApp;
 
   beforeEach(() => {
-    db = makeTestDb();
-    app = buildTestApp(db);
+    repoDir = makeTempRepo();
+    app = buildTestApp();
   });
 
   afterEach(async () => {
     await app.close();
-    db.close();
+    closeAllDbs();
+    rmSync(repoDir, { recursive: true, force: true });
   });
 
   it("returns text/markdown content for an existing task", async () => {
-    const created = await createTask(app, {
+    const created = await createTask(app, repoDir, {
       title: "Markdown test task",
       workflow_id: "coding-task",
     });
@@ -539,7 +556,7 @@ describe("GET /api/tasks/:id/markdown", () => {
 
     const res = await app.inject({
       method: "GET",
-      url: `/api/tasks/${id}/markdown`,
+      url: repoUrl(repoDir, `/api/tasks/${id}/markdown`),
     });
     expect(res.statusCode).toBe(200);
     expect(res.headers["content-type"]).toContain("text/markdown");
@@ -550,7 +567,7 @@ describe("GET /api/tasks/:id/markdown", () => {
   it("returns 404 for unknown task", async () => {
     const res = await app.inject({
       method: "GET",
-      url: "/api/tasks/T-999/markdown",
+      url: repoUrl(repoDir, "/api/tasks/T-999/markdown"),
     });
     expect(res.statusCode).toBe(404);
   });
@@ -561,21 +578,22 @@ describe("GET /api/tasks/:id/markdown", () => {
 // ---------------------------------------------------------------------------
 
 describe("GET /api/workflows", () => {
-  let db: Db;
-  let app: Awaited<ReturnType<typeof buildTestApp>>;
+  let repoDir: string;
+  let app: TestApp;
 
   beforeEach(() => {
-    db = makeTestDb();
-    app = buildTestApp(db);
+    repoDir = makeTempRepo();
+    app = buildTestApp();
   });
 
   afterEach(async () => {
     await app.close();
-    db.close();
+    closeAllDbs();
+    rmSync(repoDir, { recursive: true, force: true });
   });
 
   it("returns list of available workflows", async () => {
-    const res = await app.inject({ method: "GET", url: "/api/workflows" });
+    const res = await app.inject({ method: "GET", url: repoUrl(repoDir, "/api/workflows") });
     expect(res.statusCode).toBe(200);
     const workflows = res.json<{ id: string }[]>();
     expect(workflows).toHaveLength(1);

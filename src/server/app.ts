@@ -1,18 +1,19 @@
+/// <reference path="./fastify-augment.d.ts" />
 import Fastify from "fastify";
 import type { FastifyInstance, FastifyPluginCallback } from "fastify";
-import type Database from "better-sqlite3";
+import { isAbsolute, join } from "node:path";
+import { existsSync } from "node:fs";
 import { toHttpError } from "./errors.js";
 import { registerRestRoutes } from "./rest.js";
 import { registerWsRoute } from "./ws.js";
 import { BroadcastManager } from "./broadcaster.js";
 import { WaiterRegistry } from "../events/wait.js";
-import { ActivationState, buildMcpServer } from "../mcp/activation.js";
-import { registerMcpTransport } from "../mcp/transport.js";
-import { createTriggerMaterializer } from "../events/triggered-materializer.js";
+import { ActivationState } from "../mcp/activation.js";
+import { getDbForRepo, normalizeRepoPath } from "../db/connection.js";
 import { CONFIG_DEFAULTS } from "../config/defaults.js";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { join, dirname } from "node:path";
+import { dirname } from "node:path";
 import { createRequire } from "node:module";
 import { getWebBundlePath, hasWebBundle } from "./web-bundle.js";
 
@@ -24,12 +25,35 @@ const requireCjs = createRequire(import.meta.url);
 const fastifyWebsocket = requireCjs("@fastify/websocket") as FastifyPluginCallback;
 const fastifyStatic = requireCjs("@fastify/static") as FastifyPluginCallback;
 
-type Db = InstanceType<typeof Database>;
+// ---------------------------------------------------------------------------
+// Exempt paths — the onRequest hook does NOT require ?repo= for these.
+// REQ-S-02 (skip list), REQ-R-05 (/api/daemon/repos), REQ-D-05 (/internal/notify)
+// ---------------------------------------------------------------------------
+const HOOK_EXEMPT_PREFIXES = [
+  "/api/health",
+  "/api/daemon/repos",
+  "/internal/notify",
+  "/ws",
+];
+
+function isHookExempt(url: string): boolean {
+  // Strip query string for matching
+  const path = url.split("?")[0] ?? url;
+  if (path === "/" || path.startsWith("/assets/") || path.startsWith("/icons/")) return true;
+  for (const prefix of HOOK_EXEMPT_PREFIXES) {
+    if (path === prefix || path.startsWith(prefix + "/")) return true;
+  }
+  return false;
+}
 
 export interface AppOpts {
-  db: Db;
+  /**
+   * Path to the agentboard home directory (e.g. ~/.agentboard).
+   * Used by the registry upsert hook added in S3.
+   * Optional for backward compatibility; S1 wires it as a no-op.
+   */
+  agbHome?: string;
   logger?: boolean | object;
-  mcpActivationMode?: "lazy" | "always-on" | "prompt";
 }
 
 function readVersion(): string {
@@ -56,9 +80,9 @@ export function buildApp(opts: AppOpts): FastifyInstance & { broadcaster: Broadc
   const waiters = new WaiterRegistry();
   app.broadcaster = broadcaster;
   app.waiters = waiters;
-  // MCP activation state exposed for S7b tool handlers that call activate/deactivate
-  const activationMode = opts.mcpActivationMode ?? CONFIG_DEFAULTS.mcp.activation;
-  const activationState = new ActivationState(activationMode);
+  // MCP activation state exposed for tool handlers that call activate/deactivate.
+  // mcpActivationMode has been removed from AppOpts — daemon always uses the config default.
+  const activationState = new ActivationState(CONFIG_DEFAULTS.mcp.activation);
   app.mcpActivation = activationState;
 
   app.register(fastifyWebsocket);
@@ -68,6 +92,42 @@ export function buildApp(opts: AppOpts): FastifyInstance & { broadcaster: Broadc
     reply.status(statusCode).send(body);
   });
 
+  // ---------------------------------------------------------------------------
+  // onRequest hook: inject req.db + req.repoRoot from ?repo= query param.
+  // Skipped for exempt paths (health, notify, ws, static).
+  // REQ-S-02, REQ-R-01
+  // ---------------------------------------------------------------------------
+  app.decorateRequest("db", null);
+  app.decorateRequest("repoRoot", "");
+
+  app.addHook("onRequest", async (req, reply) => {
+    if (isHookExempt(req.url)) return;
+
+    const repoParam = (req.query as Record<string, string | undefined>)["repo"];
+    if (!repoParam) {
+      return reply.status(400).send({
+        error: "repo_missing",
+        hint: "add ?repo=<abs-path> to your request",
+      });
+    }
+
+    // Must be absolute and must have .agentboard/db.sqlite
+    if (!isAbsolute(repoParam) || !existsSync(join(repoParam, ".agentboard", "db.sqlite"))) {
+      return reply.status(400).send({
+        error: "repo_invalid",
+        hint: "path must be absolute and initialized (run: agentboard init)",
+      });
+    }
+
+    const normalizedRepo = normalizeRepoPath(repoParam);
+    req.db = getDbForRepo(normalizedRepo);
+    req.repoRoot = normalizedRepo;
+  });
+
+  // ---------------------------------------------------------------------------
+  // Routes
+  // ---------------------------------------------------------------------------
+
   app.get("/api/health", async (_req, reply) => {
     reply.send({
       ok: true,
@@ -76,10 +136,10 @@ export function buildApp(opts: AppOpts): FastifyInstance & { broadcaster: Broadc
     });
   });
 
-  const triggerMaterializer = createTriggerMaterializer(opts.db);
-  const sharedListeners = [broadcaster.listener, waiters.listener, triggerMaterializer] as const;
-
-  registerRestRoutes(app, opts.db, { listeners: sharedListeners });
+  // registerRestRoutes reads req.db from the decorated request (no db param).
+  // sharedListeners are created per-request via the hook — for the broadcaster
+  // and waiters we register them as module-level singletons here.
+  registerRestRoutes(app, broadcaster, waiters);
 
   // The WS route MUST be registered inside a queued plugin so it runs AFTER
   // @fastify/websocket. The plugin's onRoute hook only fires for routes
@@ -98,16 +158,9 @@ export function buildApp(opts: AppOpts): FastifyInstance & { broadcaster: Broadc
     });
   }
 
-  // MCP transport: wire the activation state machine + install real tool handlers, then mount on /mcp
-  const mcpServices = {
-    db: opts.db,
-    waiters,
-    broadcaster,
-    activation: activationState,
-    eventHooks: { listeners: sharedListeners },
-  };
-  const { mcpServer } = buildMcpServer(activationState, opts.db, mcpServices);
-  registerMcpTransport(app, mcpServer);
+  // NOTE: MCP transport (registerMcpTransport / buildMcpServer) has been
+  // removed from the daemon. MCP now runs as a separate STDIO process
+  // via `agentboard mcp`. See src/cli/mcp.ts (added in S4).
 
   return app;
 }

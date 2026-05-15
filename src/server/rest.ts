@@ -1,5 +1,5 @@
+/// <reference path="./fastify-augment.d.ts" />
 import type { FastifyInstance } from "fastify";
-import type Database from "better-sqlite3";
 import { z } from "zod";
 import {
   createLocal,
@@ -22,6 +22,9 @@ import {
   type SubtaskRow,
 } from "../domain/subtask.js";
 import { insertEvent, type InsertEventHooks } from "../events/insert.js";
+import type { BroadcastManager } from "./broadcaster.js";
+import type { WaiterRegistry } from "../events/wait.js";
+import { createTriggerMaterializer } from "../events/triggered-materializer.js";
 import { addFeedback } from "../feedback/add.js";
 import { findWorkflowById } from "../workflows/find.js";
 import { resolveWorkflowPaths } from "../workflows/discovery.js";
@@ -36,8 +39,6 @@ import {
 } from "./errors.js";
 import { homedir } from "node:os";
 import { join } from "node:path";
-
-type Db = InstanceType<typeof Database>;
 
 // ---------------------------------------------------------------------------
 // Compact response shapes
@@ -146,18 +147,33 @@ const AddFeedbackBody = z.object({
 
 // ---------------------------------------------------------------------------
 // Route handlers
+// All handlers read req.db and req.repoRoot (injected by the onRequest hook).
 // ---------------------------------------------------------------------------
 
-function registerTaskRoutes(app: FastifyInstance, db: Db, hooks: InsertEventHooks): void {
-  app.get("/api/tasks", async (_req, reply) => {
-    reply.send(listTasks(db).map(toCompactTask));
+function buildHooks(app: FastifyInstance, broadcaster: BroadcastManager, waiters: WaiterRegistry): (req: { db: InstanceType<typeof import("better-sqlite3")>; repoRoot: string }) => InsertEventHooks {
+  return (req) => {
+    // Per-request materializer: created each time for now.
+    // TODO: co-cache materializer per repo alongside getDbForRepo (v1 deferred,
+    // see design §2 open Q1 and tasks.md S1 note).
+    const triggerMaterializer = createTriggerMaterializer(req.db);
+    return {
+      listeners: [broadcaster.listener, waiters.listener, triggerMaterializer],
+    };
+  };
+}
+
+function registerTaskRoutes(app: FastifyInstance, broadcaster: BroadcastManager, waiters: WaiterRegistry): void {
+  const getHooks = buildHooks(app, broadcaster, waiters);
+
+  app.get("/api/tasks", async (req, reply) => {
+    reply.send(listTasks(req.db).map(toCompactTask));
   });
 
   app.get("/api/tasks/:id", async (req, reply) => {
     const { id } = req.params as { id: string };
-    const task = getTask(db, id);
+    const task = getTask(req.db, id);
     if (!task) throw new NotFoundError("task", id);
-    const subtasks = getTaskSubtasks(db, id);
+    const subtasks = getTaskSubtasks(req.db, id);
     reply.send({
       ...toTaskDetail(task),
       subtasks: subtasks.map(toSubtaskResponse),
@@ -166,17 +182,17 @@ function registerTaskRoutes(app: FastifyInstance, db: Db, hooks: InsertEventHook
 
   app.get("/api/tasks/:id/discussion", async (req, reply) => {
     const { id } = req.params as { id: string };
-    if (!getTask(db, id)) throw new NotFoundError("task", id);
-    const result = getEntries(db, id);
+    if (!getTask(req.db, id)) throw new NotFoundError("task", id);
+    const result = getEntries(req.db, id);
     reply.send(result);
   });
 
   app.get("/api/tasks/:id/markdown", async (req, reply) => {
     const { id } = req.params as { id: string };
-    const task = getTask(db, id);
+    const task = getTask(req.db, id);
     if (!task) throw new NotFoundError("task", id);
-    const subtasks = getTaskSubtasks(db, id);
-    const discussionResult = getEntries(db, id);
+    const subtasks = getTaskSubtasks(req.db, id);
+    const discussionResult = getEntries(req.db, id);
     const discussion =
       discussionResult.type === "entries" ? discussionResult.entries : [];
 
@@ -213,7 +229,8 @@ function registerTaskRoutes(app: FastifyInstance, db: Db, hooks: InsertEventHook
     }
     const { title, workflow_id, ref } = parsed.data;
 
-    const workflow = findWorkflowById({ repoRoot: process.cwd(), home: homedir() }, workflow_id);
+    // REQ-S-02: use req.repoRoot instead of process.cwd()
+    const workflow = findWorkflowById({ repoRoot: req.repoRoot, home: homedir() }, workflow_id);
     if (!workflow) {
       throw new ValidationError(`unknown workflow_id: ${workflow_id}`, "use GET /api/workflows to list available workflows");
     }
@@ -221,7 +238,7 @@ function registerTaskRoutes(app: FastifyInstance, db: Db, hooks: InsertEventHook
     const snapshotJson = JSON.stringify(snapshot);
 
     const taskId = ref
-      ? createReferenced(db, {
+      ? createReferenced(req.db, {
           title,
           workflowId: workflow_id,
           workflowSnapshot: snapshotJson,
@@ -232,17 +249,17 @@ function registerTaskRoutes(app: FastifyInstance, db: Db, hooks: InsertEventHook
           refStatus: ref.status,
           refAssignee: ref.assignee,
         })
-      : createLocal(db, {
+      : createLocal(req.db, {
           title,
           workflowId: workflow_id,
           workflowSnapshot: snapshotJson,
         });
 
-    seedWorkflowSubtasks(db, taskId, workflow);
+    seedWorkflowSubtasks(req.db, taskId, workflow);
 
-    const task = getTask(db, taskId);
+    const task = getTask(req.db, taskId);
     if (!task) throw new NotFoundError("task", taskId);
-    const subtasks = getTaskSubtasks(db, taskId);
+    const subtasks = getTaskSubtasks(req.db, taskId);
     reply.status(201).send({ ...toTaskDetail(task), subtasks: subtasks.map(toSubtaskResponse) });
   });
 
@@ -254,17 +271,18 @@ function registerTaskRoutes(app: FastifyInstance, db: Db, hooks: InsertEventHook
         parsed.error.issues.map((i) => i.message).join("; "),
       );
     }
-    if (!getTask(db, id)) throw new NotFoundError("task", id);
+    if (!getTask(req.db, id)) throw new NotFoundError("task", id);
 
-    appendEntry(db, id, "human", parsed.data.body);
-    insertEvent(db, {
+    appendEntry(req.db, id, "human", parsed.data.body);
+    const hooks = getHooks(req);
+    insertEvent(req.db, {
       taskId: id,
       type: "comment_added",
       payload: { body: parsed.data.body },
       origin: "human",
     }, hooks);
 
-    const result = getEntries(db, id);
+    const result = getEntries(req.db, id);
     const entries = result.type === "entries" ? result.entries : [];
     // appendEntry guarantees at least one entry exists at this point
     const latest = entries.at(-1);
@@ -279,12 +297,13 @@ function registerTaskRoutes(app: FastifyInstance, db: Db, hooks: InsertEventHook
         parsed.error.issues.map((i) => i.message).join("; "),
       );
     }
-    if (!getTask(db, id)) throw new NotFoundError("task", id);
+    if (!getTask(req.db, id)) throw new NotFoundError("task", id);
 
     const { label, type: subtaskType } = parsed.data;
-    const subtask = addCustomSubtask(db, id, { label, type: subtaskType });
+    const subtask = addCustomSubtask(req.db, id, { label, type: subtaskType });
 
-    insertEvent(db, {
+    const hooks = getHooks(req);
+    insertEvent(req.db, {
       taskId: id,
       type: "custom_subtask_added",
       payload: { subtask_id: subtask.id, label },
@@ -302,16 +321,19 @@ function registerTaskRoutes(app: FastifyInstance, db: Db, hooks: InsertEventHook
         parsed.error.issues.map((i) => i.message).join("; "),
       );
     }
-    if (!getTask(db, id)) throw new NotFoundError("task", id);
+    if (!getTask(req.db, id)) throw new NotFoundError("task", id);
 
     const { target, text, severity } = parsed.data;
-    const result = addFeedback(db, { target, taskId: id, text, severity, origin: "human", hooks });
+    const hooks = getHooks(req);
+    const result = addFeedback(req.db, { target, taskId: id, text, severity, origin: "human", hooks });
 
     reply.status(201).send(result);
   });
 }
 
-function registerSubtaskRoutes(app: FastifyInstance, db: Db, hooks: InsertEventHooks): void {
+function registerSubtaskRoutes(app: FastifyInstance, broadcaster: BroadcastManager, waiters: WaiterRegistry): void {
+  const getHooks = buildHooks(app, broadcaster, waiters);
+
   app.patch("/api/subtasks/:id", async (req, reply) => {
     const { id } = req.params as { id: string };
     const parsed = PatchSubtaskBody.safeParse(req.body);
@@ -321,7 +343,7 @@ function registerSubtaskRoutes(app: FastifyInstance, db: Db, hooks: InsertEventH
       );
     }
 
-    const current = getSubtask(db, id);
+    const current = getSubtask(req.db, id);
     if (!current) throw new NotFoundError("subtask", id);
 
     const { status, note } = parsed.data;
@@ -334,7 +356,7 @@ function registerSubtaskRoutes(app: FastifyInstance, db: Db, hooks: InsertEventH
           `Valid transitions from "${current.status}": ${allowed.join(", ") || "none (terminal state)"}`,
         );
       }
-      if (status === "in-progress" && !canStartSubtask(db, current.task_id, id)) {
+      if (status === "in-progress" && !canStartSubtask(req.db, current.task_id, id)) {
         throw new StateError(
           `Subtask ${id} is blocked by a preceding step with blocks_next: true`,
           "Complete or skip the blocking step before starting this one",
@@ -342,16 +364,17 @@ function registerSubtaskRoutes(app: FastifyInstance, db: Db, hooks: InsertEventH
       }
     }
 
+    const hooks = getHooks(req);
     let updated;
     if (status !== undefined) {
-      const transition = applyStatusTransition(db, id, current.status, status, note);
+      const transition = applyStatusTransition(req.db, id, current.status, status, note);
       updated = transition.updatedRow;
       for (const ev of transition.events) {
-        insertEvent(db, { taskId: current.task_id, type: ev.type, payload: ev.payload, origin: "human" }, hooks);
+        insertEvent(req.db, { taskId: current.task_id, type: ev.type, payload: ev.payload, origin: "human" }, hooks);
       }
     } else {
-      updated = applySubtaskUpdate(db, id, { note });
-      insertEvent(db, {
+      updated = applySubtaskUpdate(req.db, id, { note });
+      insertEvent(req.db, {
         taskId: current.task_id,
         type: "subtask_updated",
         payload: { task_id: current.task_id, subtask_id: id, field: "note", value: note },
@@ -364,9 +387,10 @@ function registerSubtaskRoutes(app: FastifyInstance, db: Db, hooks: InsertEventH
 }
 
 function registerWorkflowRoutes(app: FastifyInstance): void {
-  app.get("/api/workflows", async (_req, reply) => {
+  app.get("/api/workflows", async (req, reply) => {
+    // REQ-S-02: use req.repoRoot instead of process.cwd()
     const paths = resolveWorkflowPaths({
-      repoRoot: process.cwd(),
+      repoRoot: req.repoRoot,
       home: homedir(),
     });
 
@@ -382,10 +406,11 @@ function registerWorkflowRoutes(app: FastifyInstance): void {
   });
 }
 
-function registerExportRoute(app: FastifyInstance, db: Db): void {
-  app.post("/api/export", async (_req, reply) => {
-    const snapshotDir = join(process.cwd(), ".agentboard", "snapshot");
-    const result = runExportSnapshot(db, snapshotDir);
+function registerExportRoute(app: FastifyInstance): void {
+  app.post("/api/export", async (req, reply) => {
+    // REQ-S-02: use req.repoRoot instead of process.cwd()
+    const snapshotDir = join(req.repoRoot, ".agentboard", "snapshot");
+    const result = runExportSnapshot(req.db, snapshotDir);
     reply.send(result);
   });
 }
@@ -394,9 +419,20 @@ function registerExportRoute(app: FastifyInstance, db: Db): void {
 // Plugin registration
 // ---------------------------------------------------------------------------
 
-export function registerRestRoutes(app: FastifyInstance, db: Db, hooks: InsertEventHooks = {}): void {
-  registerTaskRoutes(app, db, hooks);
-  registerSubtaskRoutes(app, db, hooks);
+/**
+ * Register all REST routes. Routes read req.db and req.repoRoot from the
+ * per-request decoration injected by the onRequest hook in buildApp.
+ *
+ * The broadcaster and waiters are passed so that event hooks can notify
+ * WebSocket clients and waiting MCP tool calls.
+ */
+export function registerRestRoutes(
+  app: FastifyInstance,
+  broadcaster: BroadcastManager,
+  waiters: WaiterRegistry,
+): void {
+  registerTaskRoutes(app, broadcaster, waiters);
+  registerSubtaskRoutes(app, broadcaster, waiters);
   registerWorkflowRoutes(app);
-  registerExportRoute(app, db);
+  registerExportRoute(app);
 }

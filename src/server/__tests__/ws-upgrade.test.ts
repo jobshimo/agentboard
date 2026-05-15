@@ -1,16 +1,16 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import Database from "better-sqlite3";
+import { mkdtempSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { request } from "node:http";
-import { runMigrations } from "../../db/migrate.js";
 import { buildApp } from "../app.js";
+import { getDbForRepo, closeAllDbs } from "../../db/connection.js";
 
-type Db = InstanceType<typeof Database>;
-
-function makeTestDb(): Db {
-  const db = new Database(":memory:");
-  db.pragma("foreign_keys = ON");
-  runMigrations(db);
-  return db;
+function makeTempRepo(): string {
+  const dir = mkdtempSync(join(tmpdir(), "agb-wsup-test-"));
+  getDbForRepo(dir);
+  closeAllDbs();
+  return dir;
 }
 
 // Sends a raw HTTP/1.1 upgrade request and resolves with the response status.
@@ -42,13 +42,13 @@ function upgrade(port: number, path: string): Promise<{ statusCode: number; upgr
 }
 
 describe("WS upgrade on a listening server", () => {
-  let db: Db;
+  let repoDir: string;
   let port: number;
-  let appInstance: Awaited<ReturnType<typeof buildApp>>;
+  let appInstance: ReturnType<typeof buildApp>;
 
   beforeEach(async () => {
-    db = makeTestDb();
-    appInstance = buildApp({ db });
+    repoDir = makeTempRepo();
+    appInstance = buildApp({});
     await appInstance.listen({ port: 0, host: "127.0.0.1" });
     const addr = appInstance.server.address();
     if (!addr || typeof addr === "string") throw new Error("no listening address");
@@ -57,10 +57,12 @@ describe("WS upgrade on a listening server", () => {
 
   afterEach(async () => {
     await appInstance.close();
-    db.close();
+    closeAllDbs();
+    rmSync(repoDir, { recursive: true, force: true });
   });
 
   it("returns 101 Switching Protocols on /ws", async () => {
+    // /ws is exempt from the onRequest hook (WS upgrade path)
     const res = await upgrade(port, "/ws");
     expect(res.statusCode).toBe(101);
     expect(res.upgradeHeader?.toLowerCase()).toBe("websocket");
