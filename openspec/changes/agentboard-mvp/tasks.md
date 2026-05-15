@@ -191,10 +191,10 @@ Slices are ordered by dependency. Sequential constraints noted per slice.
 
 | # | Task | Commit | Spec refs |
 |---|------|--------|-----------|
-| 2.10b.1 | `src/web/src/components/StateDot.tsx`, `WorkflowStrip.tsx`: atom components. `StateDot` uses `data-state` selector; click → `subtask.update` via REST PATCH; right-click → context menu with `blocked / failed / skipped / done`. | `feat(web): StateDot and WorkflowStrip atoms` | design §5.1, §5.4 subtask controls, agentboard/components.jsx |
-| 2.10b.2 | `src/web/src/components/ExternalRefChip.tsx`, `OriginChip.tsx`, `StatusBadge.tsx`: mirror deliverable. `ExternalRefChip` renders github/jira/linear/local glyphs. | `feat(web): ExternalRefChip, OriginChip, StatusBadge` | design §5.1, agentboard/components.jsx |
-| 2.10b.3 | `src/web/src/components/TaskCard.tsx`: compact 2-row card. Click navigates to TaskDetail. `WorkflowStrip` embedded. Realtime: card translates between columns on `derived_status` change with 250ms ease-out CSS transition. | `feat(web): TaskCard with realtime column transition` | design §5.1, §5.4 realtime motion, agentboard/components.jsx |
-| 2.10b.4 | `src/web/src/views/Board.tsx`: Kanban board. Column default = `derived_status` macro mode (A). Workflow-step mode (B) available as toggle per prototype. Both Done column AND "Closed" sidebar view (shared filter logic). Uses `useTasks()`. | `feat(web): Board view with macro-status and workflow-step columns` | design §5.4 column mode, agentboard/board.jsx |
+| 2.10b.1 | [x] `src/web/src/components/StateDot.tsx`, `WorkflowStrip.tsx`: atom components. `StateDot` uses `data-state` selector; click → `subtask.update` via REST PATCH; right-click → context menu with `blocked / failed / skipped / done`. | `feat(web): StateDot and WorkflowStrip atoms` | design §5.1, §5.4 subtask controls, agentboard/components.jsx |
+| 2.10b.2 | [x] `src/web/src/components/ExternalRefChip.tsx`, `OriginChip.tsx`, `StatusBadge.tsx`: mirror deliverable. `ExternalRefChip` renders github/jira/linear/local glyphs. | `feat(web): ExternalRefChip, OriginChip, StatusBadge` | design §5.1, agentboard/components.jsx |
+| 2.10b.3 | [x] `src/web/src/components/TaskCard.tsx`: compact 2-row card. Click navigates to TaskDetail. `WorkflowStrip` embedded. Realtime: card translates between columns on `derived_status` change with 250ms ease-out CSS transition. | `feat(web): TaskCard with realtime column transition` | design §5.1, §5.4 realtime motion, agentboard/components.jsx |
+| 2.10b.4 | [x] `src/web/src/views/Board.tsx`: Kanban board. Column default = `derived_status` macro mode (A). Workflow-step mode (B) available as toggle per prototype. Both Done column AND "Closed" sidebar view (shared filter logic). Uses `useTasks()`. | `feat(web): Board view with macro-status and workflow-step columns` | design §5.4 column mode, agentboard/board.jsx |
 
 ---
 

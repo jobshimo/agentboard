@@ -6,7 +6,7 @@ import { TopBar } from "./chrome/TopBar";
 import { Sidebar } from "./chrome/Sidebar";
 import type { WorkflowSummary, TaskCounts } from "./chrome/Sidebar";
 import { Router, navigate } from "./router/Router";
-import { useTasks } from "./lib/store";
+import { useTasks, useWorkflowFilter } from "./lib/store";
 import type { ViewName } from "./lib/store";
 import { startWs } from "./lib/ws";
 import { getPersistedTheme, persistTheme, toggleTheme, applyThemeClass } from "./lib/theme";
@@ -20,9 +20,9 @@ const PLACEHOLDER_WORKFLOWS: WorkflowSummary[] = [];
 
 export function App() {
   const [theme, setTheme] = useState<Theme>(getPersistedTheme);
-  const [workflowFilter, setWorkflowFilter] = useState<string | null>(null);
   const [topBarView, setTopBarView] = useState<ViewName>(deriveTopBarView());
   const tasks = useTasks();
+  const workflowFilter = useWorkflowFilter();
 
   // Apply theme class to body whenever theme changes.
   useEffect(() => {
@@ -88,7 +88,7 @@ export function App() {
             activeView={topBarView}
             onPickView={handleSetView}
             workflowFilter={workflowFilter}
-            onSetWorkflowFilter={setWorkflowFilter}
+            onSetWorkflowFilter={(f) => dispatch({ type: "SET_WORKFLOW_FILTER", workflowFilter: f })}
             workflows={PLACEHOLDER_WORKFLOWS}
             taskCounts={taskCounts}
           />

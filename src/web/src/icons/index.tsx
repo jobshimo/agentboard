@@ -66,6 +66,7 @@ export const Alert         = (p: IconProps) => <Icon {...p}><path d="M8 2l6 11H2
 export const TerminalIcon  = (p: IconProps) => <Icon {...p}><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M4.5 6.5L6.5 8 4.5 9.5M8 10h3.5"/></Icon>;
 export const Wifi          = (p: IconProps) => <Icon {...p}><path d="M2 6a8 8 0 0 1 12 0M4 8.5a5 5 0 0 1 8 0M6 11a2.5 2.5 0 0 1 4 0"/><circle cx="8" cy="13.5" r=".5" fill="currentColor"/></Icon>;
 export const WifiOff       = (p: IconProps) => <Icon {...p}><path d="M2 6a8 8 0 0 1 4-2.5M14 6a8 8 0 0 0-4-2.5M4 8.5a5 5 0 0 1 2-1.5M12 8.5a5 5 0 0 0-2-1.5"/><path d="M2 2l12 12" strokeWidth="1.8"/></Icon>;
+export const MoreH         = (p: IconProps) => <Icon {...p}><circle cx="4" cy="8" r=".7" fill="currentColor"/><circle cx="8" cy="8" r=".7" fill="currentColor"/><circle cx="12" cy="8" r=".7" fill="currentColor"/></Icon>;
 
 // Origin glyphs
 export const GitHubMark = ({ sz = 12 }: { sz?: number }) => (

@@ -48,6 +48,14 @@ describe("getState initial shape", () => {
   it("starts on board route", () => {
     expect(getState().route).toEqual({ view: "board" });
   });
+
+  it("starts with null workflowFilter", () => {
+    expect(getState().workflowFilter).toBeNull();
+  });
+
+  it("starts in macro column mode", () => {
+    expect(getState().columnMode).toBe("macro");
+  });
 });
 
 describe("dispatch SET_TASKS", () => {
@@ -109,6 +117,32 @@ describe("dispatch SET_ROUTE", () => {
   it("sets settings route", () => {
     dispatch({ type: "SET_ROUTE", route: { view: "settings" } });
     expect(getState().route.view).toBe("settings");
+  });
+});
+
+describe("dispatch SET_WORKFLOW_FILTER", () => {
+  it("sets workflowFilter from null to a value", () => {
+    dispatch({ type: "SET_WORKFLOW_FILTER", workflowFilter: "feature" });
+    expect(getState().workflowFilter).toBe("feature");
+  });
+
+  it("clears workflowFilter back to null", () => {
+    dispatch({ type: "SET_WORKFLOW_FILTER", workflowFilter: "feature" });
+    dispatch({ type: "SET_WORKFLOW_FILTER", workflowFilter: null });
+    expect(getState().workflowFilter).toBeNull();
+  });
+});
+
+describe("dispatch SET_COLUMN_MODE", () => {
+  it("sets columnMode to workflow", () => {
+    dispatch({ type: "SET_COLUMN_MODE", columnMode: "workflow" });
+    expect(getState().columnMode).toBe("workflow");
+  });
+
+  it("resets columnMode to macro", () => {
+    dispatch({ type: "SET_COLUMN_MODE", columnMode: "workflow" });
+    dispatch({ type: "SET_COLUMN_MODE", columnMode: "macro" });
+    expect(getState().columnMode).toBe("macro");
   });
 });
 
