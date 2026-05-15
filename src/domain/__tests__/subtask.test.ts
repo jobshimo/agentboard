@@ -318,6 +318,25 @@ describe("applyStatusTransition", () => {
     expect(events.some((e) => e.type === "task_blocked")).toBe(true);
   });
 
+  it("task_blocked payload includes both task_id and subtask_id (spec L48)", () => {
+    const taskId = makeTask(db);
+    const s = addCustomSubtask(db, taskId, { label: "step" });
+    applySubtaskUpdate(db, s.id, { status: "in-progress" });
+    recomputeTaskStatus(db, taskId);
+    const { events } = applyStatusTransition(db, s.id, "in-progress", "blocked");
+    const blocked = events.find((e) => e.type === "task_blocked");
+    expect(blocked?.payload["task_id"]).toBe(taskId);
+    expect(blocked?.payload["subtask_id"]).toBe(s.id);
+  });
+
+  it("single write when both status and note change (N1 no double-write)", () => {
+    const taskId = makeTask(db);
+    const s = addCustomSubtask(db, taskId, { label: "step" });
+    const { updatedRow } = applyStatusTransition(db, s.id, "pending", "in-progress", "my note");
+    expect(updatedRow.status).toBe("in-progress");
+    expect(updatedRow.note).toBe("my note");
+  });
+
   it("does not include task_completed when other subtasks are still pending", () => {
     const taskId = makeTask(db);
     const s1 = addCustomSubtask(db, taskId, { label: "A" });

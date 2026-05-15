@@ -51,10 +51,8 @@ export function installSubtaskUpdateTool(
       const prevCompact = compactSubtask(current);
       let updated;
       if (args.status !== undefined) {
-        const transition = applyStatusTransition(db, args.id, current.status, args.status);
-        updated = args.note !== undefined
-          ? applySubtaskUpdate(db, args.id, { note: args.note })
-          : transition.updatedRow;
+        const transition = applyStatusTransition(db, args.id, current.status, args.status, args.note);
+        updated = transition.updatedRow;
         for (const ev of transition.events) {
           insertEvent(db, { taskId: current.task_id, type: ev.type, payload: ev.payload, origin: "agent" }, eventHooks);
         }
@@ -63,7 +61,7 @@ export function installSubtaskUpdateTool(
         insertEvent(db, {
           taskId: current.task_id,
           type: "subtask_updated",
-          payload: { task_id: current.task_id, subtask_id: args.id, note: args.note },
+          payload: { task_id: current.task_id, subtask_id: args.id, field: "note", value: args.note },
           origin: "agent",
         }, eventHooks);
       }

@@ -243,6 +243,22 @@ describe("task.start", () => {
     expect(events).toHaveLength(1);
   });
 
+  it("status_change payload includes task_id, subtask_id, from_status, to_status (spec L42)", async () => {
+    const sessionId = seedSession(db);
+    seedTask(db, "T-1");
+    seedSubtask(db, "T-1", "s-1", { status: "pending", position: 0 });
+
+    await callTool(activeTools, "task.start", { id: "T-1" }, sessionId);
+
+    const events = db.prepare("SELECT payload FROM events WHERE task_id = 'T-1' AND type = 'status_change'").all() as { payload: string }[];
+    expect(events).toHaveLength(1);
+    const payload = JSON.parse(events[0]!.payload);
+    expect(payload.task_id).toBe("T-1");
+    expect(payload.subtask_id).toBe("s-1");
+    expect(payload.from_status).toBe("pending");
+    expect(payload.to_status).toBe("in-progress");
+  });
+
   it("throws StateError when no pending subtask exists", async () => {
     const sessionId = seedSession(db);
     seedTask(db, "T-1");
@@ -370,6 +386,38 @@ describe("subtask.update", () => {
     const events = db.prepare("SELECT type FROM events WHERE task_id = 'T-1'").all() as { type: string }[];
     expect(events.some((e) => e.type === "subtask_updated")).toBe(true);
     expect(events.some((e) => e.type === "status_change")).toBe(false);
+  });
+
+  it("subtask_updated payload uses { task_id, subtask_id, field, value } shape (spec L44)", async () => {
+    const sessionId = seedSession(db);
+    seedTask(db, "T-1");
+    seedSubtask(db, "T-1", "s-1", { status: "in-progress" });
+
+    await callTool(activeTools, "subtask.update", { id: "s-1", note: "sha:abc" }, sessionId);
+    const events = db.prepare("SELECT payload FROM events WHERE task_id = 'T-1' AND type = 'subtask_updated'").all() as { payload: string }[];
+    expect(events).toHaveLength(1);
+    const payload = JSON.parse(events[0]!.payload);
+    expect(payload.task_id).toBe("T-1");
+    expect(payload.subtask_id).toBe("s-1");
+    expect(payload.field).toBe("note");
+    expect(payload.value).toBe("sha:abc");
+  });
+
+  it("single event emitted (no double-write) when both status and note change", async () => {
+    const sessionId = seedSession(db);
+    seedTask(db, "T-1");
+    seedSubtask(db, "T-1", "s-1", { status: "pending" });
+
+    await callTool(activeTools, "subtask.update", { id: "s-1", status: "in-progress", note: "started" }, sessionId);
+
+    const events = db.prepare("SELECT type FROM events WHERE task_id = 'T-1'").all() as { type: string }[];
+    // Only status_change — no separate subtask_updated for the note
+    expect(events.filter((e) => e.type === "status_change")).toHaveLength(1);
+    expect(events.filter((e) => e.type === "subtask_updated")).toHaveLength(0);
+
+    const row = db.prepare("SELECT status, note FROM subtasks WHERE id = 's-1'").get() as any;
+    expect(row.status).toBe("in-progress");
+    expect(row.note).toBe("started");
   });
 
   it("emits task_completed when the last subtask reaches a terminal state", async () => {

@@ -8,7 +8,7 @@ import { resolvePort, PortInUseError } from "../server/port.js";
 import { hasWebBundle } from "../server/web-bundle.js";
 import { loadConfig } from "../config/load.js";
 import { runEventGc } from "../events/gc.js";
-import { runInit } from "./init.js";
+import { initDb, seedUserWorkflows } from "./init.js";
 import { getVersion } from "./version.js";
 import {
   printLine,
@@ -49,8 +49,10 @@ export async function runStart(opts: StartOpts): Promise<void> {
   // Determine whether this is the first run before runInit creates the dir.
   const firstRun = !existsSync(join(cwd, ".agentboard", "db.sqlite"));
 
-  // runInit is idempotent: creates dir, opens DB (applies migrations), gitignore.
-  runInit(cwd);
+  // initDb is idempotent: creates dir, opens DB (applies migrations), gitignore.
+  initDb(cwd);
+  // Seed the global workflows dir on first run so there is a template to copy.
+  seedUserWorkflows();
 
   // Config comes from ~/.agentboard/config.yaml (AGB_HOME overrides home).
   const agbHome = process.env["AGB_HOME"] ?? join(homedir(), ".agentboard");

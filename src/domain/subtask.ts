@@ -163,6 +163,7 @@ export function applyStatusTransition(
   subtaskId: string,
   fromStatus: SubtaskStatus,
   toStatus: SubtaskStatus,
+  note?: string,
 ): { updatedRow: SubtaskRow; events: TransitionEvent[] } {
   // Capture prevDerived BEFORE applying the update so cascade comparisons are accurate.
   const taskIdRow = db
@@ -176,7 +177,7 @@ export function applyStatusTransition(
       | undefined
   )?.derived_status;
 
-  const updatedRow = applySubtaskUpdate(db, subtaskId, { status: toStatus });
+  const updatedRow = applySubtaskUpdate(db, subtaskId, { status: toStatus, note });
   const nextDerived = recomputeTaskStatus(db, taskId);
 
   const events: TransitionEvent[] = [
@@ -187,7 +188,7 @@ export function applyStatusTransition(
   ];
 
   if (nextDerived === "blocked" && prevDerived !== "blocked") {
-    events.push({ type: "task_blocked", payload: { task_id: taskId } });
+    events.push({ type: "task_blocked", payload: { task_id: taskId, subtask_id: subtaskId } });
   }
 
   if (nextDerived === "done" && prevDerived !== "done") {

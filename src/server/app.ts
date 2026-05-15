@@ -8,6 +8,7 @@ import { BroadcastManager } from "./broadcaster.js";
 import { WaiterRegistry } from "../events/wait.js";
 import { ActivationState, buildMcpServer } from "../mcp/activation.js";
 import { registerMcpTransport } from "../mcp/transport.js";
+import { createTriggerMaterializer } from "../events/triggered-materializer.js";
 import { CONFIG_DEFAULTS } from "../config/defaults.js";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -75,7 +76,10 @@ export function buildApp(opts: AppOpts): FastifyInstance & { broadcaster: Broadc
     });
   });
 
-  registerRestRoutes(app, opts.db, { listeners: [broadcaster.listener, waiters.listener] });
+  const triggerMaterializer = createTriggerMaterializer(opts.db);
+  const sharedListeners = [broadcaster.listener, waiters.listener, triggerMaterializer] as const;
+
+  registerRestRoutes(app, opts.db, { listeners: sharedListeners });
 
   // The WS route MUST be registered inside a queued plugin so it runs AFTER
   // @fastify/websocket. The plugin's onRoute hook only fires for routes
@@ -100,7 +104,7 @@ export function buildApp(opts: AppOpts): FastifyInstance & { broadcaster: Broadc
     waiters,
     broadcaster,
     activation: activationState,
-    eventHooks: { listeners: [broadcaster.listener, waiters.listener] },
+    eventHooks: { listeners: sharedListeners },
   };
   const { mcpServer } = buildMcpServer(activationState, opts.db, mcpServices);
   registerMcpTransport(app, mcpServer);

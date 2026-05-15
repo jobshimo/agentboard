@@ -2,7 +2,7 @@ import { z } from "zod";
 import { installTool } from "./install.js";
 import { withPiggyback } from "../piggyback.js";
 import { getTask, getTaskSubtasks } from "../../domain/task.js";
-import { applySubtaskUpdate, validTransitions, recomputeTaskStatus, canStartSubtask } from "../../domain/subtask.js";
+import { applyStatusTransition, validTransitions, canStartSubtask } from "../../domain/subtask.js";
 import { insertEvent } from "../../events/insert.js";
 import { NotFoundError, StateError } from "../../server/errors.js";
 import type { RegisteredTool } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -41,15 +41,16 @@ export function installTaskStartTool(
         );
       }
 
-      const updated = applySubtaskUpdate(db, pending.id, { status: "in-progress" });
-      recomputeTaskStatus(db, args.id);
+      const { updatedRow: updated, events } = applyStatusTransition(
+        db,
+        pending.id,
+        pending.status,
+        "in-progress",
+      );
 
-      insertEvent(db, {
-        taskId: args.id,
-        type: "status_change",
-        payload: { subtask_id: pending.id, from_status: pending.status, to_status: "in-progress" },
-        origin: "agent",
-      }, eventHooks);
+      for (const ev of events) {
+        insertEvent(db, { taskId: args.id, type: ev.type, payload: ev.payload, origin: "agent" }, eventHooks);
+      }
 
       const result = await withPiggyback(db, extra.sessionId, {
         started_subtask: updated.id,

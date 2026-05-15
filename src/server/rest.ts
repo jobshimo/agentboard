@@ -344,10 +344,8 @@ function registerSubtaskRoutes(app: FastifyInstance, db: Db, hooks: InsertEventH
 
     let updated;
     if (status !== undefined) {
-      const transition = applyStatusTransition(db, id, current.status, status);
-      updated = note !== undefined
-        ? applySubtaskUpdate(db, id, { note })
-        : transition.updatedRow;
+      const transition = applyStatusTransition(db, id, current.status, status, note);
+      updated = transition.updatedRow;
       for (const ev of transition.events) {
         insertEvent(db, { taskId: current.task_id, type: ev.type, payload: ev.payload, origin: "human" }, hooks);
       }
@@ -356,7 +354,7 @@ function registerSubtaskRoutes(app: FastifyInstance, db: Db, hooks: InsertEventH
       insertEvent(db, {
         taskId: current.task_id,
         type: "subtask_updated",
-        payload: { subtask_id: id, note },
+        payload: { task_id: current.task_id, subtask_id: id, field: "note", value: note },
         origin: "human",
       }, hooks);
     }

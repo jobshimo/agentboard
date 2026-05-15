@@ -19,6 +19,19 @@ export type DiscussionResult =
 
 const SUMMARY_THRESHOLD = 50;
 
+type DiscussionRow = {
+  id: number;
+  task_id: string;
+  author: DiscussionAuthor;
+  body: string;
+  tag: string | null;
+  created_at: string;
+};
+
+function mapEntryRow(r: DiscussionRow): DiscussionEntry {
+  return { id: r.id, taskId: r.task_id, author: r.author, body: r.body, tag: r.tag, createdAt: r.created_at };
+}
+
 /**
  * Appends a new discussion entry to the task.
  * Throws with a "task not found" message if the task id is invalid —
@@ -73,25 +86,9 @@ export function getEntries(
 
   const rows = (
     limit !== undefined ? query.all(taskId, limit) : query.all(taskId)
-  ) as Array<{
-    id: number;
-    task_id: string;
-    author: DiscussionAuthor;
-    body: string;
-    tag: string | null;
-    created_at: string;
-  }>;
+  ) as DiscussionRow[];
 
-  const entries: DiscussionEntry[] = rows.map((r) => ({
-    id: r.id,
-    taskId: r.task_id,
-    author: r.author,
-    body: r.body,
-    tag: r.tag,
-    createdAt: r.created_at,
-  }));
-
-  return { type: "entries", entries };
+  return { type: "entries", entries: rows.map(mapEntryRow) };
 }
 
 /**
@@ -105,23 +102,7 @@ export function getAllEntries(db: Db, taskId: string): DiscussionResult {
         "SELECT id, task_id, author, body, tag, created_at FROM discussion_entries WHERE task_id = ? ORDER BY id ASC",
       )
       .all(taskId)
-  ) as Array<{
-    id: number;
-    task_id: string;
-    author: DiscussionAuthor;
-    body: string;
-    tag: string | null;
-    created_at: string;
-  }>;
+  ) as DiscussionRow[];
 
-  const entries: DiscussionEntry[] = rows.map((r) => ({
-    id: r.id,
-    taskId: r.task_id,
-    author: r.author,
-    body: r.body,
-    tag: r.tag,
-    createdAt: r.created_at,
-  }));
-
-  return { type: "entries", entries };
+  return { type: "entries", entries: rows.map(mapEntryRow) };
 }
