@@ -3,6 +3,7 @@
 
 import { ListIcon } from "../../icons";
 import type { WorkflowSummary } from "../../lib/api";
+import { en } from "../../i18n/en";
 
 const WF_COLORS = ["#58a6ff", "#3fb950", "#a371f7", "#d29922", "#f85149", "#79c0ff"];
 
@@ -21,11 +22,11 @@ interface Props {
 export function WorkflowsSection({ workflows }: Props) {
   return (
     <div className="settings-block">
-      <h3><ListIcon sz={14} /> Workflows</h3>
-      <p className="desc">Installed templates. Snapshots are taken from these at task start.</p>
+      <h3><ListIcon sz={14} /> {en.settings_workflows_title}</h3>
+      <p className="desc">{en.settings_workflows_desc}</p>
       {workflows.length === 0 && (
         <p className="muted" style={{ fontSize: 12, margin: 0 }}>
-          No workflows found. Add YAML files to <span className="mono">~/.agentboard/workflows/</span>.
+          {en.settings_workflows_empty}
         </p>
       )}
       {workflows.map(wf => (
@@ -56,8 +57,8 @@ function WorkflowCard({ workflow: wf }: { workflow: WorkflowSummary }) {
         </div>
       </div>
       <div style={{ display: "flex", gap: 6, alignItems: "start" }}>
-        <button className="btn small ghost">Open YAML</button>
-        <button className="btn small">Copy to repo</button>
+        <button className="btn small ghost">{en.settings_workflow_btn_open}</button>
+        <button className="btn small">{en.settings_workflow_btn_copy}</button>
       </div>
     </div>
   );

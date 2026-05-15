@@ -238,9 +238,9 @@ Slices are ordered by dependency. Sequential constraints noted per slice.
 
 | # | Task | Commit | Spec refs | Depends on |
 |---|------|--------|-----------|------------|
-| 4.1 | `README.md`: minimal — `npx @jobshimo/agentboard` quick-start; MCP config snippet for Claude Code (add `agentboard` to `mcpServers`); `init` / `export` commands; `--port` flag. Known-good host matrix (Claude Code as first entry). No Co-Authored-By. | `docs(readme): quick-start, MCP config, and host matrix` | launcher.md, mcp-surface.md §host matrix, design §2.4 | S9 done |
-| 4.2 | `src/web/src/i18n/en.ts` copy audit: verify every visible string in all four views (Board, TaskDetail, Settings, chrome) is keyed in the copy module, not hardcoded. Fix any stray literals. | `fix(web): audit and complete i18n copy keys` | design §5.4 i18n | S10d done |
-| 4.3 | `.agentboard/workflows/` default template: ship a `coding-task.yaml` example workflow (implement → tests → review → commit steps) in the npm package under `templates/workflows/` so `agentboard init` has something to copy. | `docs(workflows): default coding-task workflow template` | workflows.md §discovery | S9 done |
+| 4.1 | [x] `README.md`: minimal — `npx @jobshimo/agentboard` quick-start; MCP config snippet for Claude Code (add `agentboard` to `mcpServers`); `init` / `export` commands; `--port` flag. Known-good host matrix (Claude Code as first entry). No Co-Authored-By. | `docs(readme): quick-start, MCP config, and host matrix` | launcher.md, mcp-surface.md §host matrix, design §2.4 | S9 done |
+| 4.2 | [x] `src/web/src/i18n/en.ts` copy audit: verify every visible string in all four views (Board, TaskDetail, Settings, chrome) is keyed in the copy module, not hardcoded. Fix any stray literals. | `fix(web): audit and complete i18n copy keys` | design §5.4 i18n | S10d done |
+| 4.3 | [x] `.agentboard/workflows/` default template: ship a `coding-task.yaml` example workflow (implement → tests → review → commit steps) in the npm package under `templates/workflows/` so `agentboard init` has something to copy. | `docs(workflows): default coding-task workflow template` | workflows.md §discovery | S9 done |
 
 ---
 

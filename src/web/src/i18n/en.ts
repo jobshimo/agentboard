@@ -89,6 +89,66 @@ export const en = {
   search_coming_soon_title: "Search coming soon",
   search_coming_soon_body: "⌘K will open a command palette in a future release.",
 
+  // TaskDetail sub-bar labels
+  detail_workflow: "Workflow",
+  detail_snapshot: "Snapshot",
+  detail_snapshot_taken: "Snapshot taken",
+  detail_feedback_btn: "Feedback",
+  detail_close_task: "Close task",
+
+  // TaskDetail section headings
+  detail_section_workflow_snapshot: "Workflow snapshot",
+  detail_section_custom_subtasks: "Custom subtasks",
+  detail_snapshot_locked_prefix: "Locked from",
+  detail_snapshot_taken_prefix: "taken",
+  detail_snapshot_chip: "immutable",
+  detail_outside_snapshot: "outside snapshot",
+  detail_immutability_note: "Steps can't be edited. The workflow snapshot is frozen at task start. To deviate, add a custom subtask.",
+  detail_aria_more: "More options",
+
+  // Feedback form
+  feedback_title: "Submit feedback",
+  feedback_cancel: "Cancel",
+  feedback_close: "Close",
+  feedback_help: "Help the agent improve. Stored and surfaced on matching future tasks.",
+  feedback_target_placeholder: "Target (e.g. subtask type, step id, workflow)",
+  feedback_text_placeholder: "Describe what could be improved or what went wrong…",
+  feedback_severity_label: "Severity",
+  feedback_submit: "Submit",
+  feedback_sent: "Feedback submitted. The agent will see it on the next relevant task.",
+
+  // Custom subtask form
+  custom_subtask_add_btn: "Add custom subtask",
+  custom_subtask_placeholder: "Subtask label…",
+  custom_subtask_confirm: "Add",
+  custom_subtask_cancel: "Cancel",
+
+  // Discussion thread
+  discussion_title: "Discussion",
+  discussion_messages: "messages",
+  discussion_summarize: "Summarize",
+
+  // Empty board
+  empty_board_title: "Nothing on the board",
+  empty_board_body_prefix: "Tasks land here when the agent calls",
+  empty_board_body_suffix: "you create one from the UI, or you reference an external issue.",
+  empty_board_new_task: "New task",
+  empty_board_reference: "Reference issue…",
+
+  // Column mode toggle
+  col_mode_label: "Columns by",
+
+  // Board column
+  board_col_empty: "No tasks here.",
+  board_col_aria_more: "More",
+  board_col_aria_add: "Add",
+
+  // Comment form
+  comment_placeholder: "Write a comment in markdown. Anything you say lands in the next agent turn via the event queue.",
+  comment_hint: "⌘ + Enter to send · Markdown",
+  comment_custom_subtask: "Custom subtask",
+  comment_submit: "Comment",
+
   // Generic
   back: "← Back",
   loading: "Loading…",

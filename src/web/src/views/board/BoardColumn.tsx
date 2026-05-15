@@ -5,6 +5,7 @@ import type { CompactTask } from "../../lib/store";
 import type { ColumnDef } from "../../lib/board-grouping";
 import { TaskCard } from "../../components/TaskCard";
 import { MoreH, Plus } from "../../icons";
+import { en } from "../../i18n/en";
 
 interface BoardColumnProps {
   col: ColumnDef;
@@ -19,10 +20,10 @@ export function BoardColumn({ col, tasks, onOpen }: BoardColumnProps) {
         <span className="ab-col-name">{col.label}</span>
         <span className="ab-col-count">{tasks.length}</span>
         <div style={{ marginLeft: "auto", display: "flex", gap: 2 }}>
-          <button className="ab-iconbtn" style={{ width: 22, height: 22 }} aria-label="More">
+          <button className="ab-iconbtn" style={{ width: 22, height: 22 }} aria-label={en.board_col_aria_more}>
             <MoreH sz={12} />
           </button>
-          <button className="ab-iconbtn" style={{ width: 22, height: 22 }} aria-label="Add">
+          <button className="ab-iconbtn" style={{ width: 22, height: 22 }} aria-label={en.board_col_aria_add}>
             <Plus sz={12} />
           </button>
         </div>
@@ -35,7 +36,7 @@ export function BoardColumn({ col, tasks, onOpen }: BoardColumnProps) {
             color: "var(--fg-subtle)",
             fontSize: 12,
           }}>
-            No tasks here.
+            {en.board_col_empty}
           </div>
         )}
         {tasks.map((t) => (

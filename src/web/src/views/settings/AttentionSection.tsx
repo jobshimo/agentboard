@@ -2,11 +2,12 @@
 // Ported 1:1 from agentboard/settings.jsx "Attention" block.
 
 import { TerminalIcon } from "../../icons";
+import { en } from "../../i18n/en";
 
 export function AttentionSection() {
   return (
     <div className="settings-block">
-      <h3><TerminalIcon sz={14} /> Attention</h3>
+      <h3><TerminalIcon sz={14} /> {en.settings_attention_title}</h3>
       <p className="desc">
         How the agent learns about events while it's working. See <span className="mono">§9</span> of DESIGN.md.
       </p>

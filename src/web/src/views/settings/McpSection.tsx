@@ -4,6 +4,7 @@
 
 import { useState } from "react";
 import { Bolt } from "../../icons";
+import { en } from "../../i18n/en";
 
 type ActivationMode = "lazy" | "always-on" | "prompt";
 
@@ -25,7 +26,7 @@ export function McpSection({ port }: Props) {
 
   return (
     <div className="settings-block">
-      <h3><Bolt sz={14} /> MCP activation</h3>
+      <h3><Bolt sz={14} /> {en.settings_mcp_title}</h3>
       <p className="desc">
         How the agent's tool surface is exposed. {MODE_DESCRIPTIONS[mode]}
       </p>
@@ -42,7 +43,7 @@ export function McpSection({ port }: Props) {
         ))}
       </div>
       <div className="kv-grid">
-        <span className="k">MCP endpoint</span>
+        <span className="k">{en.settings_kv_mcp_endpoint}</span>
         <span className="v">
           <a href={endpoint} className="mono" style={{ color: "var(--accent-fg)", textDecoration: "none" }}>
             {endpoint}

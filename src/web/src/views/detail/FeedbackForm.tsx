@@ -6,6 +6,7 @@ import { useState } from "react";
 import { postFeedback } from "../../lib/api";
 import type { FeedbackPayload } from "../../lib/api";
 import { Info } from "../../icons";
+import { en } from "../../i18n/en";
 
 interface FeedbackFormProps {
   taskId: string;
@@ -42,8 +43,8 @@ export function FeedbackForm({ taskId, onClose }: FeedbackFormProps) {
     return (
       <div className="banner" data-tone="success" style={{ marginTop: 12 }}>
         <Info sz={13} className="icon" />
-        <span>Feedback submitted. The agent will see it on the next relevant task.</span>
-        <button className="btn ghost small" onClick={onClose} style={{ marginLeft: "auto" }}>Close</button>
+        <span>{en.feedback_sent}</span>
+        <button className="btn ghost small" onClick={onClose} style={{ marginLeft: "auto" }}>{en.feedback_close}</button>
       </div>
     );
   }
@@ -51,27 +52,27 @@ export function FeedbackForm({ taskId, onClose }: FeedbackFormProps) {
   return (
     <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
       <div className="h-row">
-        <h3>Submit feedback</h3>
-        <button className="btn ghost small" onClick={onClose}>Cancel</button>
+        <h3>{en.feedback_title}</h3>
+        <button className="btn ghost small" onClick={onClose}>{en.feedback_cancel}</button>
       </div>
       <p className="muted" style={{ margin: 0, fontSize: 12 }}>
-        Help the agent improve. Stored and surfaced on matching future tasks.
+        {en.feedback_help}
       </p>
       <input
         className="composer-input"
-        placeholder="Target (e.g. subtask type, step id, workflow)"
+        placeholder={en.feedback_target_placeholder}
         style={{ minHeight: "unset", padding: "6px 10px" }}
         value={target}
         onChange={e => setTarget(e.target.value)}
       />
       <textarea
         className="composer-input"
-        placeholder="Describe what could be improved or what went wrong…"
+        placeholder={en.feedback_text_placeholder}
         value={text}
         onChange={e => setText(e.target.value)}
       />
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <span className="muted" style={{ fontSize: 12 }}>Severity</span>
+        <span className="muted" style={{ fontSize: 12 }}>{en.feedback_severity_label}</span>
         {SEVERITIES.map(s => (
           <button
             key={s}
@@ -87,7 +88,7 @@ export function FeedbackForm({ taskId, onClose }: FeedbackFormProps) {
           onClick={() => void submit()}
           disabled={sending || !target.trim() || !text.trim()}
         >
-          Submit
+          {en.feedback_submit}
         </button>
       </div>
     </div>

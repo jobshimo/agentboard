@@ -87,37 +87,37 @@ export function TaskDetail({ taskId, onBack }: TaskDetailProps) {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <StatusBadge derived_status={task.derived_status} />
-          <button className="ab-iconbtn" aria-label="More options"><MoreH sz={14} /></button>
+          <button className="ab-iconbtn" aria-label={en.detail_aria_more}><MoreH sz={14} /></button>
         </div>
       </div>
 
       {/* Sub-bar: workflow metadata + action buttons */}
       <div className="ab-detail-sub">
         <span>
-          <span className="muted">Workflow</span>{" · "}
+          <span className="muted">{en.detail_workflow}</span>{" · "}
           <span className="mono">{wf?.label || task.workflow_id}</span>
         </span>
         {wf && <>
           <span className="muted">·</span>
           <span>
-            <span className="muted">Snapshot</span>{" · "}
+            <span className="muted">{en.detail_snapshot}</span>{" · "}
             <span className="mono">{wf.id}{wf.version ? `@${wf.version}` : ""}</span>
           </span>
         </>}
         {task.snapshot_taken_at && <>
           <span className="muted">·</span>
           <span>
-            <span className="muted">Snapshot taken</span>{" · "}
+            <span className="muted">{en.detail_snapshot_taken}</span>{" · "}
             <span className="mono">{new Date(task.snapshot_taken_at).toLocaleDateString()}</span>
           </span>
         </>}
         <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
           <button className="btn small ghost" onClick={() => setShowFeedback(f => !f)}>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-              <Send sz={11} /> Feedback
+              <Send sz={11} /> {en.detail_feedback_btn}
             </span>
           </button>
-          <button className="btn small">Close task</button>
+          <button className="btn small">{en.detail_close_task}</button>
         </div>
       </div>
 
@@ -128,18 +128,18 @@ export function TaskDetail({ taskId, onBack }: TaskDetailProps) {
           {/* Workflow snapshot section */}
           <div>
             <div className="h-row">
-              <h3>Workflow snapshot</h3>
+              <h3>{en.detail_section_workflow_snapshot}</h3>
               <span className="chip" data-tone="skipped" title="The workflow snapshot is locked for an in-flight task.">
-                <Lock sz={10} /> immutable
+                <Lock sz={10} /> {en.detail_snapshot_chip}
               </span>
             </div>
             {wf && (
               <div className="wf-meta">
                 <Lock sz={11} className="lock" />
                 <span>
-                  Locked from <span className="mono">{wf.id}{wf.version ? `@${wf.version}` : ""}</span>
+                  {en.detail_snapshot_locked_prefix}{" "}<span className="mono">{wf.id}{wf.version ? `@${wf.version}` : ""}</span>
                   {task.snapshot_taken_at && (
-                    <> · taken <span className="mono">{new Date(task.snapshot_taken_at).toLocaleDateString()}</span></>
+                    <> · {en.detail_snapshot_taken_prefix}{" "}<span className="mono">{new Date(task.snapshot_taken_at).toLocaleDateString()}</span></>
                   )}
                 </span>
               </div>
@@ -159,8 +159,8 @@ export function TaskDetail({ taskId, onBack }: TaskDetailProps) {
           {/* Custom subtasks section */}
           <div>
             <div className="h-row">
-              <h3>Custom subtasks</h3>
-              <span className="muted mono" style={{ fontSize: 11 }}>outside snapshot</span>
+              <h3>{en.detail_section_custom_subtasks}</h3>
+              <span className="muted mono" style={{ fontSize: 11 }}>{en.detail_outside_snapshot}</span>
             </div>
             <div className="subtask-list">
               {customSubtasks.map(s => (
@@ -173,10 +173,7 @@ export function TaskDetail({ taskId, onBack }: TaskDetailProps) {
           {/* Inline help — immutability explanation */}
           <div className="banner" data-tone="info">
             <Info sz={13} className="icon" />
-            <span>
-              <strong>Steps can't be edited.</strong> The workflow snapshot is frozen at
-              task start. To deviate, add a <span className="mono">custom subtask</span>.
-            </span>
+            <span>{en.detail_immutability_note}</span>
           </div>
 
           {/* Feedback form — shown inline below the info banner */}

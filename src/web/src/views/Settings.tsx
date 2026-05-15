@@ -8,6 +8,7 @@ import { McpSection } from "./settings/McpSection";
 import { WorkflowsSection } from "./settings/WorkflowsSection";
 import { AttentionSection } from "./settings/AttentionSection";
 import { SnapshotsSection } from "./settings/SnapshotsSection";
+import { en } from "../i18n/en";
 
 function resolvePort(): number {
   if (typeof window !== "undefined" && window.location.port) {
@@ -23,10 +24,10 @@ export function Settings() {
 
   return (
     <div className="settings-page">
-      <h2>Settings</h2>
+      <h2>{en.settings_title}</h2>
       <p className="lede">
-        Local config for <span className="mono">jobshimo/agentboard</span>. Workflows live in{" "}
-        <span className="mono">~/.agentboard/workflows/</span> globally; this repo can override via{" "}
+        {en.settings_lede_prefix} <span className="mono">jobshimo/agentboard</span>. {en.settings_lede_global}{" "}
+        <span className="mono">~/.agentboard/workflows/</span> {en.settings_lede_override}{" "}
         <span className="mono">agentboard init</span>.
       </p>
       <ServerSection port={port} health={health} />

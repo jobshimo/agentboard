@@ -1,6 +1,7 @@
 // Empty state — board has no tasks. Mirrors states.jsx EmptyStateNoTasks.
 
 import { Inbox, Plus } from "../../icons";
+import { en } from "../../i18n/en";
 
 export function EmptyBoard() {
   return (
@@ -18,18 +19,18 @@ export function EmptyBoard() {
         }}>
           <Inbox sz={26} />
         </div>
-        <h2>Nothing on the board</h2>
+        <h2>{en.empty_board_title}</h2>
         <p>
-          Tasks land here when the agent calls <span className="mono">task.create</span>,
-          you create one from the UI, or you reference an external issue.
+          {en.empty_board_body_prefix} <span className="mono">task.create</span>,{" "}
+          {en.empty_board_body_suffix}
         </p>
         <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
           <button className="btn primary">
             <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-              <Plus sz={11} /> New task
+              <Plus sz={11} /> {en.empty_board_new_task}
             </span>
           </button>
-          <button className="btn">Reference issue…</button>
+          <button className="btn">{en.empty_board_reference}</button>
         </div>
       </div>
     </div>

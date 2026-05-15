@@ -7,6 +7,7 @@ import { groupTasks, getColumns } from "../lib/board-grouping";
 import { BoardColumn } from "./board/BoardColumn";
 import { EmptyBoard } from "./board/EmptyBoard";
 import { navigate } from "../router/Router";
+import { en } from "../i18n/en";
 
 export function Board() {
   const tasks = useTasks();
@@ -31,7 +32,7 @@ export function Board() {
         position: "absolute", top: 12, right: 16, zIndex: 2,
         display: "flex", alignItems: "center", gap: 8,
       }}>
-        <span className="muted" style={{ fontSize: 11 }}>Columns by</span>
+        <span className="muted" style={{ fontSize: 11 }}>{en.col_mode_label}</span>
         <div style={{
           display: "flex", gap: 2,
           background: "var(--bg-subtle)", padding: 2,

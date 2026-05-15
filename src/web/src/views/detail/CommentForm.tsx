@@ -6,6 +6,7 @@ import type { KeyboardEvent } from "react";
 import { Plus } from "../../icons";
 import { postComment } from "../../lib/api";
 import { dispatch } from "../../lib/store";
+import { en } from "../../i18n/en";
 
 interface CommentFormProps {
   taskId: string;
@@ -42,23 +43,23 @@ export function CommentForm({ taskId, onAddCustomSubtask }: CommentFormProps) {
     <div className="composer">
       <textarea
         className="composer-input"
-        placeholder="Write a comment in markdown. Anything you say lands in the next agent turn via the event queue."
+        placeholder={en.comment_placeholder}
         value={text}
         onChange={e => setText(e.target.value)}
         onKeyDown={handleKeyDown}
         disabled={sending}
       />
       <div className="composer-actions">
-        <span className="composer-hint">⌘ + Enter to send · Markdown</span>
+        <span className="composer-hint">{en.comment_hint}</span>
         {onAddCustomSubtask && (
           <button className="btn ghost small" onClick={onAddCustomSubtask}>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-              <Plus sz={11} /> Custom subtask
+              <Plus sz={11} /> {en.comment_custom_subtask}
             </span>
           </button>
         )}
         <button className="btn primary" onClick={() => void submit()} disabled={sending || !text.trim()}>
-          Comment
+          {en.comment_submit}
         </button>
       </div>
     </div>

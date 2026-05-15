@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Plus } from "../../icons";
 import { postCustomSubtask } from "../../lib/api";
 import { dispatch } from "../../lib/store";
+import { en } from "../../i18n/en";
 
 interface AddCustomSubtaskFormProps {
   taskId: string;
@@ -34,7 +35,7 @@ export function AddCustomSubtaskForm({ taskId }: AddCustomSubtaskFormProps) {
   if (!open) {
     return (
       <button className="add-custom" onClick={() => setOpen(true)}>
-        <Plus sz={11} /> Add custom subtask
+        <Plus sz={11} /> {en.custom_subtask_add_btn}
       </button>
     );
   }
@@ -44,7 +45,7 @@ export function AddCustomSubtaskForm({ taskId }: AddCustomSubtaskFormProps) {
       <input
         className="composer-input"
         autoFocus
-        placeholder="Subtask label…"
+        placeholder={en.custom_subtask_placeholder}
         style={{ flex: 1, minHeight: "unset", padding: "5px 8px" }}
         value={label}
         onChange={e => setLabel(e.target.value)}
@@ -54,8 +55,8 @@ export function AddCustomSubtaskForm({ taskId }: AddCustomSubtaskFormProps) {
         }}
         disabled={adding}
       />
-      <button className="btn small primary" onClick={() => void submit()} disabled={adding || !label.trim()}>Add</button>
-      <button className="btn ghost small" onClick={() => setOpen(false)}>Cancel</button>
+      <button className="btn small primary" onClick={() => void submit()} disabled={adding || !label.trim()}>{en.custom_subtask_confirm}</button>
+      <button className="btn ghost small" onClick={() => setOpen(false)}>{en.custom_subtask_cancel}</button>
     </div>
   );
 }

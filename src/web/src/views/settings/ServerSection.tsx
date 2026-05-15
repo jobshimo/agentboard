@@ -3,6 +3,7 @@
 
 import { Cube } from "../../icons";
 import type { HealthInfo } from "../../lib/api";
+import { en } from "../../i18n/en";
 
 interface Props {
   port: number;
@@ -23,24 +24,22 @@ export function ServerSection({ port, health }: Props) {
 
   return (
     <div className="settings-block">
-      <h3><Cube sz={14} /> Server</h3>
-      <p className="desc">
-        Local launcher running. The agent talks via the MCP endpoint; the UI talks via REST + WebSocket.
-      </p>
+      <h3><Cube sz={14} /> {en.settings_server_title}</h3>
+      <p className="desc">{en.settings_server_desc}</p>
       <div className="kv-grid">
-        <span className="k">Web UI</span>
+        <span className="k">{en.settings_kv_web_ui}</span>
         <span className="v">{base}</span>
-        <span className="k">MCP endpoint</span>
+        <span className="k">{en.settings_kv_mcp_endpoint}</span>
         <span className="v">{base}/mcp</span>
-        <span className="k">Database</span>
+        <span className="k">{en.settings_kv_database}</span>
         <span className="v">.agentboard/db.sqlite</span>
-        <span className="k">Snapshot dir</span>
+        <span className="k">{en.settings_kv_snapshot_dir}</span>
         <span className="v">.agentboard/snapshot/</span>
         {health && (
           <>
-            <span className="k">Version</span>
+            <span className="k">{en.settings_kv_version}</span>
             <span className="v">{health.version}</span>
-            <span className="k">Uptime</span>
+            <span className="k">{en.settings_kv_uptime}</span>
             <span className="v">{formatUptime(health.uptime_ms)}</span>
           </>
         )}

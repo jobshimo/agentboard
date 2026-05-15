@@ -4,6 +4,7 @@
 import { useState } from "react";
 import { Archive, Send } from "../../icons";
 import { postExport } from "../../lib/api";
+import { en } from "../../i18n/en";
 
 export function SnapshotsSection() {
   const [exporting, setExporting] = useState(false);
@@ -22,17 +23,17 @@ export function SnapshotsSection() {
 
   return (
     <div className="settings-block">
-      <h3><Archive sz={14} /> Snapshots</h3>
-      <p className="desc">Export current board to markdown for git commit.</p>
+      <h3><Archive sz={14} /> {en.settings_snapshots_title}</h3>
+      <p className="desc">{en.settings_snapshots_desc}</p>
       <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
         <button className="btn" onClick={handleExport} disabled={exporting}>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-            <Send sz={12} />{exporting ? "Exporting…" : "agentboard export"}
+            <Send sz={12} />{exporting ? en.settings_export_in_progress : en.settings_export_btn}
           </span>
         </button>
         {lastExport && (
           <span className="muted" style={{ fontSize: 12 }}>
-            last export · <span className="mono">{lastExport}</span>
+            {en.settings_export_last} <span className="mono">{lastExport}</span>
           </span>
         )}
       </div>
