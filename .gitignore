@@ -12,3 +12,4 @@ node_modules/
 # Vite / web build
 src/web/dist/
 dist/web/
+.agentboard/db.sqlite
