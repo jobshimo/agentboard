@@ -1,6 +1,9 @@
 // Ported from agentboard/chrome.jsx — TopBar component.
 // Wired to store for connection state and notifications.
+// S7: repo dropdown replacing static "agentboard" text.
 
+import { useState } from "react";
+import { basename } from "../lib/path-utils";
 import type { ViewName } from "../lib/store";
 import type { Theme } from "../lib/theme";
 import { LogoMark, Folder, ChevronDown, Search, Sun, Moon, Gear } from "../icons";
@@ -13,9 +16,18 @@ interface TopBarProps {
   onSetView: (v: ViewName) => void;
   theme: Theme;
   onToggleTheme: () => void;
+  /** S7: list of known repo paths from GET /api/daemon/repos */
+  availableRepos: string[];
+  /** S7: currently active repo root (null = none selected) */
+  activeRepo: string | null;
+  /** S7: called when the user selects a different repo */
+  onSwitchRepo: (repo: string) => void;
 }
 
-export function TopBar({ view, onSetView, theme, onToggleTheme }: TopBarProps) {
+export function TopBar({ view, onSetView, theme, onToggleTheme, availableRepos, activeRepo, onSwitchRepo }: TopBarProps) {
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const repoLabel = activeRepo != null ? basename(activeRepo) : en.repo_none;
+
   return (
     <div className="ab-topbar">
       <div className="ab-brand">
@@ -24,11 +36,44 @@ export function TopBar({ view, onSetView, theme, onToggleTheme }: TopBarProps) {
         <span className="muted mono" style={{ fontSize: 11, marginLeft: 4 }}>{en.brand_version}</span>
       </div>
       <span className="muted">/</span>
-      <div className="ab-breadcrumb">
+
+      {/* S7: Repo selector dropdown */}
+      <div className="ab-breadcrumb" style={{ position: "relative" }}>
         <Folder sz={12} />
-        <span className="repo">agentboard</span>
-        <ChevronDown sz={11} />
+        <button
+          className="ab-repo-selector"
+          onClick={() => setDropdownOpen((o) => !o)}
+          aria-haspopup="listbox"
+          aria-expanded={dropdownOpen}
+        >
+          <span className="repo">{repoLabel}</span>
+          <ChevronDown sz={11} />
+        </button>
+
+        {dropdownOpen && availableRepos.length > 0 && (
+          <ul
+            className="ab-repo-dropdown"
+            role="listbox"
+            style={{ position: "absolute", top: "100%", left: 0, zIndex: 100 }}
+          >
+            {availableRepos.map((repo) => (
+              <li
+                key={repo}
+                role="option"
+                aria-selected={repo === activeRepo}
+                onClick={() => {
+                  onSwitchRepo(repo);
+                  setDropdownOpen(false);
+                }}
+              >
+                <span className="repo-basename">{basename(repo)}</span>
+                <span className="repo-full muted">{repo}</span>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
+
       <div className="ab-tabs">
         <button
           className="ab-tab"

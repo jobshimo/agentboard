@@ -32,6 +32,9 @@ export interface StoreState {
   // Settings view state
   workflows: WorkflowSummary[];
   health: HealthInfo | null;
+  // S7: repo selector — activeRepo persisted to localStorage
+  activeRepo: string | null;
+  availableRepos: string[];
 }
 
 // Re-export types — consumers can import from either api or store.
@@ -40,6 +43,15 @@ export type { CompactTask, TaskFull, SubtaskCompact, DiscussionEntry, WorkflowSu
 type Listener = () => void;
 
 const listeners = new Set<Listener>();
+
+// S7: initialise activeRepo from localStorage on first load
+function getInitialActiveRepo(): string | null {
+  try {
+    return localStorage.getItem("agentboard.activeRepo");
+  } catch {
+    return null;
+  }
+}
 
 let state: StoreState = {
   tasks: [],
@@ -52,6 +64,8 @@ let state: StoreState = {
   discussion: {},
   workflows: [],
   health: null,
+  activeRepo: getInitialActiveRepo(),
+  availableRepos: [],
 };
 
 function getSnapshot(): StoreState {
@@ -85,7 +99,10 @@ export type Action =
   | { type: "UPSERT_SUBTASK"; taskId: string; subtask: SubtaskCompact }
   // S10d — settings actions
   | { type: "SET_WORKFLOWS"; workflows: WorkflowSummary[] }
-  | { type: "SET_HEALTH"; health: HealthInfo };
+  | { type: "SET_HEALTH"; health: HealthInfo }
+  // S7 — repo selector actions
+  | { type: "SET_ACTIVE_REPO"; activeRepo: string | null }
+  | { type: "SET_AVAILABLE_REPOS"; availableRepos: string[] };
 
 export function dispatch(action: Action): void {
   switch (action.type) {
@@ -137,6 +154,20 @@ export function dispatch(action: Action): void {
     case "SET_HEALTH":
       state = { ...state, health: action.health };
       break;
+    case "SET_ACTIVE_REPO":
+      state = { ...state, activeRepo: action.activeRepo };
+      // Persist to localStorage for next page load
+      if (action.activeRepo !== null) {
+        try {
+          localStorage.setItem("agentboard.activeRepo", action.activeRepo);
+        } catch {
+          // Ignore storage errors
+        }
+      }
+      break;
+    case "SET_AVAILABLE_REPOS":
+      state = { ...state, availableRepos: action.availableRepos };
+      break;
   }
   notifyListeners();
 }
@@ -154,6 +185,8 @@ export function _resetStore(initial?: Partial<StoreState>): void {
     discussion: {},
     workflows: [],
     health: null,
+    activeRepo: null,
+    availableRepos: [],
     ...initial,
   };
   // Do NOT notify — tests control when assertions run.
@@ -203,9 +236,23 @@ export function useHealth(): HealthInfo | null {
   return useSyncExternalStore(subscribe, () => getSnapshot().health);
 }
 
+// S7 — repo selector hooks
+export function useActiveRepo(): string | null {
+  return useSyncExternalStore(subscribe, () => getSnapshot().activeRepo);
+}
+
+export function useAvailableRepos(): string[] {
+  return useSyncExternalStore(subscribe, () => getSnapshot().availableRepos);
+}
+
 // For non-React consumers (e.g. ws.ts needs to read current view).
 export function getState(): StoreState {
   return state;
+}
+
+// S7: get active repo without a React hook (for api.ts)
+export function getActiveRepo(): string | null {
+  return state.activeRepo;
 }
 
 // Re-export ViewName so consumers only need to import from one place.

@@ -6,12 +6,12 @@ import { TopBar } from "./chrome/TopBar";
 import { Sidebar } from "./chrome/Sidebar";
 import type { WorkflowSummary, TaskCounts } from "./chrome/Sidebar";
 import { Router, navigate } from "./router/Router";
-import { useTasks, useWorkflowFilter } from "./lib/store";
+import { useTasks, useWorkflowFilter, useActiveRepo, useAvailableRepos } from "./lib/store";
 import type { ViewName } from "./lib/store";
-import { startWs } from "./lib/ws";
+import { startWs, closeAndReopen } from "./lib/ws";
 import { getPersistedTheme, persistTheme, toggleTheme, applyThemeClass } from "./lib/theme";
 import type { Theme } from "./lib/theme";
-import { fetchTasks } from "./lib/api";
+import { fetchTasks, fetchRepos } from "./lib/api";
 import { dispatch } from "./lib/store";
 
 // Workflows are static metadata — the real list comes from GET /api/workflows in S10d.
@@ -23,6 +23,8 @@ export function App() {
   const [topBarView, setTopBarView] = useState<ViewName>(deriveTopBarView());
   const tasks = useTasks();
   const workflowFilter = useWorkflowFilter();
+  const activeRepo = useActiveRepo();
+  const availableRepos = useAvailableRepos();
 
   // Apply theme class to body whenever theme changes.
   useEffect(() => {
@@ -30,13 +32,34 @@ export function App() {
     persistTheme(theme);
   }, [theme]);
 
-  // Boot: start WS client and initial task fetch.
+  // Boot: S7 — fetch repos BEFORE tasks; pick activeRepo from localStorage or list[0].
   useEffect(() => {
-    startWs();
-    fetchTasks()
-      .then(t => dispatch({ type: "SET_TASKS", tasks: t }))
-      .catch(() => { /* server may not be running during dev; WS reconnect covers it */ });
-  }, []);
+    fetchRepos()
+      .then(({ repos }) => {
+        dispatch({ type: "SET_AVAILABLE_REPOS", availableRepos: repos.map((r) => r.path) });
+        // Pick from localStorage (already in state) or default to first repo
+        const stored = localStorage.getItem("agentboard.activeRepo");
+        const pick = (stored && repos.some((r) => r.path === stored))
+          ? stored
+          : (repos[0]?.path ?? null);
+        if (pick) {
+          dispatch({ type: "SET_ACTIVE_REPO", activeRepo: pick });
+          startWs(pick);
+          fetchTasks()
+            .then((t) => dispatch({ type: "SET_TASKS", tasks: t }))
+            .catch(() => { /* server may not be running during dev */ });
+        }
+        // If no repos: show empty hint (EmptyBoard handles this via activeRepo === null)
+      })
+      .catch(() => {
+        // Daemon may not be running — start WS with whatever repo is set
+        startWs();
+        fetchTasks()
+          .then((t) => dispatch({ type: "SET_TASKS", tasks: t }))
+          .catch(() => { /* server may not be running during dev; WS reconnect covers it */ });
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // only on mount
 
   // Keep topBarView in sync with hash changes (e.g. browser back/forward).
   useEffect(() => {
@@ -74,6 +97,14 @@ export function App() {
     setTheme(prev => toggleTheme(prev));
   }
 
+  // S7: switching repo rebinds WS + re-fetches board
+  function handleSwitchRepo(repo: string): void {
+    closeAndReopen(repo);
+    fetchTasks()
+      .then((t) => dispatch({ type: "SET_TASKS", tasks: t }))
+      .catch(() => { /* server may not be running */ });
+  }
+
   return (
     <div className={`ab-app theme-${theme}`} style={{ width: "100%", height: "100%" }}>
       <div className="ab-shell">
@@ -82,6 +113,9 @@ export function App() {
           onSetView={handleSetView}
           theme={theme}
           onToggleTheme={handleToggleTheme}
+          availableRepos={availableRepos}
+          activeRepo={activeRepo}
+          onSwitchRepo={handleSwitchRepo}
         />
         <div className="ab-main">
           <Sidebar

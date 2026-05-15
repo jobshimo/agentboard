@@ -1,6 +1,30 @@
 // Thin REST adapter — the only file that calls fetch().
 // Components never fetch directly; they use hooks that read from the store.
 
+// S7: import getActiveRepo for ?repo= auto-append
+import { getActiveRepo } from "./store";
+
+// Paths that do NOT require ?repo= (exempt from onRequest hook)
+const REPO_EXEMPT_PATHS = new Set(["/api/health", "/api/daemon/repos"]);
+
+function withRepo(path: string): string {
+  // Don't append ?repo= to exempt paths
+  const bare = path.split("?")[0] ?? path;
+  if (REPO_EXEMPT_PATHS.has(bare)) return path;
+  const activeRepo = getActiveRepo();
+  if (!activeRepo) return path;
+  const sep = path.includes("?") ? "&" : "?";
+  return `${path}${sep}repo=${encodeURIComponent(activeRepo)}`;
+}
+
+/** Thrown when no activeRepo is set and a request requires one. */
+export class NoActiveRepoError extends Error {
+  constructor() {
+    super("No active repo selected. Use the repo dropdown in the top bar.");
+    this.name = "NoActiveRepoError";
+  }
+}
+
 // Compact task shape returned by GET /api/tasks.
 // Defined here (not in store) so the import graph stays acyclic: store → api, never api → store.
 export interface CompactTask {
@@ -51,7 +75,8 @@ export interface DiscussionEntry {
 }
 
 async function apiGet<T>(path: string): Promise<T> {
-  const res = await fetch(path);
+  const url = withRepo(path);
+  const res = await fetch(url);
   if (!res.ok) {
     const body = await res.text();
     throw new Error(`GET ${path} → ${res.status}: ${body}`);
@@ -65,7 +90,8 @@ export type DiscussionResponse =
   | { type: "summary"; summary: string; entries: DiscussionEntry[] };
 
 async function apiPost<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(path, {
+  const url = withRepo(path);
+  const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -78,7 +104,8 @@ async function apiPost<T>(path: string, body: unknown): Promise<T> {
 }
 
 async function apiPatch<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(path, {
+  const url = withRepo(path);
+  const res = await fetch(url, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -160,6 +187,16 @@ export interface ExportResult {
 
 export function fetchWorkflows(): Promise<WorkflowSummary[]> {
   return apiGet<WorkflowSummary[]>("/api/workflows");
+}
+
+// S7: fetch known repos from daemon (exempt from ?repo= requirement)
+export interface RepoEntry {
+  path: string;
+  lastSeenAt: string;
+}
+
+export function fetchRepos(): Promise<{ repos: RepoEntry[] }> {
+  return apiGet<{ repos: RepoEntry[] }>("/api/daemon/repos");
 }
 
 export function fetchHealth(): Promise<HealthInfo> {

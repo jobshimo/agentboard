@@ -5,6 +5,7 @@ export const en = {
   // Topbar
   brand_name: "agentboard",
   brand_version: "v0.1.0",
+  repo_none: "no repo",
   search_placeholder: "Search tasks, refs…",
   search_shortcut: "⌘K",
   tab_board: "Board",

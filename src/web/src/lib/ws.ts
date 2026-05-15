@@ -2,6 +2,7 @@
 // On each message: parses the signal-only push and calls invalidateTasks.
 // Backoff: 250ms → 500 → 1000 → 2000 → 4000 → 8000ms (capped).
 // After 5 consecutive failures: connection state becomes 'offline'.
+// S7: startWs accepts optional repoRoot; closeAndReopen switches repos.
 
 import { dispatch } from "./store";
 import { fetchTasks } from "./api";
@@ -96,17 +97,37 @@ function connect(url: string): void {
 
 // Default URL targets the same host as the SPA so Vite proxies in dev
 // and the production server serves both on the same origin.
-function defaultWsUrl(): string {
+// S7: append ?repo= when an activeRepo is known.
+function defaultWsUrl(repoRoot?: string): string {
   if (typeof window === "undefined") return "ws://localhost:7733/ws";
   const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
-  return `${proto}//${window.location.host}/ws`;
+  const base = `${proto}//${window.location.host}/ws`;
+  if (repoRoot) return `${base}?repo=${encodeURIComponent(repoRoot)}`;
+  return base;
 }
 
 // Starts the WS client. Idempotent if already started.
-export function startWs(url: string = defaultWsUrl()): void {
+export function startWs(repoRoot?: string): void {
+  const url = defaultWsUrl(repoRoot);
   if (socket || retryTimer) return;
   stopped = false;
   connect(url);
+}
+
+/**
+ * S7: Close the current WS connection and re-open for a new repo.
+ * Dispatches SET_ACTIVE_REPO, writes localStorage, starts new connection.
+ */
+export function closeAndReopen(newRepo: string): void {
+  stopWs();
+  // dispatch is already imported at the top of this module
+  dispatch({ type: "SET_ACTIVE_REPO", activeRepo: newRepo });
+  try {
+    localStorage.setItem("agentboard.activeRepo", newRepo);
+  } catch {
+    // Ignore
+  }
+  startWs(newRepo);
 }
 
 // Tears down the WS client cleanly (used in tests and before HMR).
