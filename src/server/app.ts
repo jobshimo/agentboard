@@ -1,6 +1,5 @@
 import Fastify from "fastify";
-import type { FastifyInstance } from "fastify";
-import fastifyWebsocket from "@fastify/websocket";
+import type { FastifyInstance, FastifyPluginCallback } from "fastify";
 import type Database from "better-sqlite3";
 import { toHttpError } from "./errors.js";
 import { registerRestRoutes } from "./rest.js";
@@ -13,6 +12,14 @@ import { CONFIG_DEFAULTS } from "../config/defaults.js";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { join, dirname } from "node:path";
+import { createRequire } from "node:module";
+
+// CJS package exposes its fastify-plugin-wrapped function on module.exports
+// but also reassigns module.exports.default to the raw function — which makes
+// Node's ESM default import resolve to the unwrapped version. createRequire
+// returns the real module.exports so the plugin metadata stays intact.
+const requireCjs = createRequire(import.meta.url);
+const fastifyWebsocket = requireCjs("@fastify/websocket") as FastifyPluginCallback;
 
 type Db = InstanceType<typeof Database>;
 
