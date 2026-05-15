@@ -174,14 +174,14 @@ Slices are ordered by dependency. Sequential constraints noted per slice.
 
 | # | Task | Commit | Spec refs |
 |---|------|--------|-----------|
-| 2.10a.1 | `src/web/src/lib/ws.ts`: reconnecting WS client — exponential backoff 250ms→8s; surface `'reconnecting'` after first failure, `'offline'` after 5; refetch `/api/tasks` on reconnect. | `feat(web): reconnecting WebSocket client` | realtime-ui.md §auto-reconnect, design §5.3 |
-| 2.10a.2 | `src/web/src/lib/api.ts`: `fetchTasks()`, `fetchTask(id)`, `fetchDiscussion(id)` — thin wrappers over `fetch`. | `feat(web): REST API client` | design §5.3 |
-| 2.10a.3 | `src/web/src/lib/store.ts`: `StoreState` shape; `useTasks()`, `useTask(id)`, `useDiscussion(id)`, `useConnection()` via `useSyncExternalStore`. WS push calls `store.invalidate(taskId)` → re-fetches entity → `notifyListeners()`. | `feat(web): useSyncExternalStore WS-backed store` | design §5.3, realtime-ui.md §signal-only push |
-| 2.10a.4 | `src/web/src/i18n/en.ts`: all UI copy strings as a flat key→string map. English only. Keys designed for Spanish drop-in. | `feat(web): i18n copy module (en)` | design §5.4 i18n |
-| 2.10a.5 | `src/web/src/styles.css`: verbatim copy of `agentboard/styles.css`. Theme classes `theme-dark` / `theme-light` on `body`. | `feat(web): styles verbatim from deliverable` | design §5.2 |
-| 2.10a.6 | `src/web/src/icons/`: port all icon components from `agentboard/icons.jsx` to individual `.tsx` files. | `feat(web): icon components from deliverable` | design §5.1 icons |
-| 2.10a.7 | `src/web/src/chrome/TopBar.tsx` + `src/web/src/chrome/Sidebar.tsx`: mirror `agentboard/chrome.jsx`. `ConnectionIndicator.tsx` wired to `useConnection()`. Notification bell wired to `useNotifications()` (stack-by-task, count per design §5.4). `⌘K` placeholder "coming soon" per design §5.4 search palette. | `feat(web): app chrome — TopBar, Sidebar, ConnectionIndicator` | design §5.1, §5.4, agentboard/chrome.jsx |
-| 2.10a.8 | `src/web/src/App.tsx`: local state `view: 'board' \| 'detail' \| 'settings'`; `selectedTaskId`; mount TopBar + Sidebar + view switcher. Mirrors `agentboard/prototype.jsx` wiring. | `feat(web): App root and view routing` | design §5.1 App.tsx, agentboard/prototype.jsx |
+| 2.10a.1 | [x] `src/web/src/lib/ws.ts`: reconnecting WS client — exponential backoff 250ms→8s; surface `'reconnecting'` after first failure, `'offline'` after 5; refetch `/api/tasks` on reconnect. | `feat(web): reconnecting WebSocket client` | realtime-ui.md §auto-reconnect, design §5.3 |
+| 2.10a.2 | [x] `src/web/src/lib/api.ts`: `fetchTasks()`, `fetchTask(id)`, `fetchDiscussion(id)` — thin wrappers over `fetch`. | `feat(web): REST API client` | design §5.3 |
+| 2.10a.3 | [x] `src/web/src/lib/store.ts`: `StoreState` shape; `useTasks()`, `useTask(id)`, `useDiscussion(id)`, `useConnection()` via `useSyncExternalStore`. WS push calls `store.invalidate(taskId)` → re-fetches entity → `notifyListeners()`. | `feat(web): useSyncExternalStore WS-backed store` | design §5.3, realtime-ui.md §signal-only push |
+| 2.10a.4 | [x] `src/web/src/i18n/en.ts`: all UI copy strings as a flat key→string map. English only. Keys designed for Spanish drop-in. | `feat(web): i18n copy module (en)` | design §5.4 i18n |
+| 2.10a.5 | [x] `src/web/src/styles.css`: verbatim copy of `agentboard/styles.css`. Theme classes `theme-dark` / `theme-light` on `body`. | `feat(web): styles verbatim from deliverable` | design §5.2 |
+| 2.10a.6 | [x] `src/web/src/icons/`: port all icon components from `agentboard/icons.jsx` to individual `.tsx` files. | `feat(web): icon components from deliverable` | design §5.1 icons |
+| 2.10a.7 | [x] `src/web/src/chrome/TopBar.tsx` + `src/web/src/chrome/Sidebar.tsx`: mirror `agentboard/chrome.jsx`. `ConnectionIndicator.tsx` wired to `useConnection()`. Notification bell wired to `useNotifications()` (stack-by-task, count per design §5.4). `⌘K` placeholder "coming soon" per design §5.4 search palette. | `feat(web): app chrome — TopBar, Sidebar, ConnectionIndicator` | design §5.1, §5.4, agentboard/chrome.jsx |
+| 2.10a.8 | [x] `src/web/src/App.tsx`: local state `view: 'board' \| 'detail' \| 'settings'`; `selectedTaskId`; mount TopBar + Sidebar + view switcher. Mirrors `agentboard/prototype.jsx` wiring. | `feat(web): App root and view routing` | design §5.1 App.tsx, agentboard/prototype.jsx |
 
 ---
 
