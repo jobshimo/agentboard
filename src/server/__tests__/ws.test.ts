@@ -54,22 +54,25 @@ function makeEvent(overrides: Partial<InsertedEvent> = {}): InsertedEvent {
 }
 
 // ---------------------------------------------------------------------------
-// BroadcastManager unit tests
+// BroadcastManager unit tests (S6: repo-scoped)
+// All tests use "" as a synthetic repoRoot to keep them repo-agnostic
 // ---------------------------------------------------------------------------
+
+const REPO = ""; // synthetic repo key for unit tests
 
 describe("BroadcastManager", () => {
   it("attachClient adds a client to the set", () => {
     const manager = new BroadcastManager();
     const ws = { send: vi.fn(), readyState: 1 };
-    manager.attachClient(ws as Sendable);
+    manager.attachClient(ws as Sendable, REPO);
     expect(manager.clientCount()).toBe(1);
   });
 
   it("detachClient removes a client from the set", () => {
     const manager = new BroadcastManager();
     const ws = { send: vi.fn(), readyState: 1 };
-    manager.attachClient(ws as Sendable);
-    manager.detachClient(ws as Sendable);
+    manager.attachClient(ws as Sendable, REPO);
+    manager.detachClient(ws as Sendable, REPO);
     expect(manager.clientCount()).toBe(0);
   });
 
@@ -77,11 +80,11 @@ describe("BroadcastManager", () => {
     const manager = new BroadcastManager();
     const ws1 = { send: vi.fn(), readyState: 1 };
     const ws2 = { send: vi.fn(), readyState: 1 };
-    manager.attachClient(ws1 as Sendable);
-    manager.attachClient(ws2 as Sendable);
+    manager.attachClient(ws1 as Sendable, REPO);
+    manager.attachClient(ws2 as Sendable, REPO);
 
     const event = makeEvent({ taskId: "T-1", type: "status_change", payload: { subtask_id: "s-1", from_status: "pending", to_status: "in-progress" } });
-    manager.listener(event);
+    manager.listener(event, REPO);
 
     const expected = JSON.stringify({
       event: "status_change",
@@ -95,10 +98,10 @@ describe("BroadcastManager", () => {
   it("listener sends entity_ids as empty array for events without entity ids", () => {
     const manager = new BroadcastManager();
     const ws = { send: vi.fn(), readyState: 1 };
-    manager.attachClient(ws as Sendable);
+    manager.attachClient(ws as Sendable, REPO);
 
     const event = makeEvent({ taskId: "T-2", type: "task_completed", payload: { task_id: "T-2" } });
-    manager.listener(event);
+    manager.listener(event, REPO);
 
     const msg = JSON.parse(ws.send.mock.calls[0][0] as string) as unknown;
     expect(msg).toMatchObject({ event: "task_completed", task_id: "T-2", entity_ids: [] });
@@ -111,26 +114,26 @@ describe("BroadcastManager", () => {
       readyState: 1,
     };
     const goodWs = { send: vi.fn(), readyState: 1 };
-    manager.attachClient(badWs as Sendable);
-    manager.attachClient(goodWs as Sendable);
+    manager.attachClient(badWs as Sendable, REPO);
+    manager.attachClient(goodWs as Sendable, REPO);
 
     const event = makeEvent();
-    expect(() => manager.listener(event)).not.toThrow();
+    expect(() => manager.listener(event, REPO)).not.toThrow();
     expect(goodWs.send).toHaveBeenCalledOnce();
   });
 
   it("listener with no clients does nothing", () => {
     const manager = new BroadcastManager();
-    expect(() => manager.listener(makeEvent())).not.toThrow();
+    expect(() => manager.listener(makeEvent(), REPO)).not.toThrow();
   });
 
   it("listener is bound — can be passed as a callback without losing context", () => {
     const manager = new BroadcastManager();
     const ws = { send: vi.fn(), readyState: 1 };
-    manager.attachClient(ws as Sendable);
+    manager.attachClient(ws as Sendable, REPO);
 
     const listener = manager.listener; // destructured — no explicit bind
-    listener(makeEvent());
+    listener(makeEvent(), REPO);
 
     expect(ws.send).toHaveBeenCalledOnce();
   });
@@ -138,10 +141,10 @@ describe("BroadcastManager", () => {
   it("maps '_global' sentinel task_id to null in the wire payload", () => {
     const manager = new BroadcastManager();
     const ws = { send: vi.fn(), readyState: 1 };
-    manager.attachClient(ws as Sendable);
+    manager.attachClient(ws as Sendable, REPO);
 
     const event = makeEvent({ taskId: "_global", type: "agent_notification", payload: { urgency: "info", text: "hello" } });
-    manager.listener(event);
+    manager.listener(event, REPO);
 
     const msg = JSON.parse(ws.send.mock.calls[0][0] as string) as { task_id: unknown };
     expect(msg.task_id).toBeNull();
@@ -174,9 +177,11 @@ describe("WS integration — POST /api/tasks/:id/comments triggers broadcast", (
       readyState: 1,
     };
 
-    // Access broadcaster exposed on app to inject client
+    // Access broadcaster exposed on app to inject client.
+    // S6: attach with the same repoRoot that REST requests will use.
     const broadcaster = (app as unknown as { broadcaster: BroadcastManager }).broadcaster;
-    broadcaster.attachClient(fakeWs as Sendable);
+    const { normalizeRepoPath } = await import("../../db/connection.js");
+    broadcaster.attachClient(fakeWs as Sendable, normalizeRepoPath(repoDir));
 
     // Create a task first
     await app.inject({
