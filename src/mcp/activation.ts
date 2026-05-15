@@ -7,6 +7,7 @@ import {
 import type { McpActivationMode } from "../config/schema.js";
 import { installTools } from "./tools/index.js";
 import type { McpServices } from "./tools/types.js";
+import { insertAgentSession, deactivateAgentSession } from "../domain/sessions.js";
 
 type Db = InstanceType<typeof Database>;
 
@@ -69,10 +70,7 @@ export class ActivationState {
    */
   activate(db: Db, presetSessionId?: string): ActivateResult {
     const session_id = presetSessionId ?? randomUUID();
-    db.prepare(
-      `INSERT INTO agent_sessions (id, last_event_id, connected_at, last_seen, active)
-       VALUES (?, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 1)`,
-    ).run(session_id);
+    insertAgentSession({ db, sessionId: session_id });
 
     if (this.#mcpServer) {
       setToolsEnabled(this.#activeTools, ACTIVE_TOOL_NAMES, true);
@@ -86,7 +84,7 @@ export class ActivationState {
   }
 
   deactivate(sessionId: string, db: Db): void {
-    db.prepare("UPDATE agent_sessions SET active = 0 WHERE id = ?").run(sessionId);
+    deactivateAgentSession({ db, sessionId });
 
     if (this.#mcpServer) {
       setToolsEnabled(this.#activeTools, ACTIVE_TOOL_NAMES, false);
