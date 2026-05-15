@@ -16,12 +16,16 @@ import { getDbForRepo } from "../db/connection.js";
 import { probeForExistingDaemon } from "./spawn-daemon.js";
 
 interface ParsedArgs {
-  command: "start" | "daemon" | "init" | "export" | "stop" | "status" | "mcp" | "help" | "version";
+  command: "start" | "daemon" | "init" | "export" | "stop" | "status" | "mcp" | "help" | "version" | "install" | "uninstall" | "doctor";
   port: number;
   noOpen: boolean;
   verbose: boolean;
   /** --repo flag: only accepted when command === "mcp". */
   repo: string | null;
+  /** --client <id>: only accepted when command === "install" or "uninstall". */
+  client: string | null;
+  /** --dry-run flag: only accepted when command === "install" or "uninstall". */
+  dryRun: boolean;
 }
 
 // Returns a structured result instead of side-effecting immediately so tests
@@ -34,6 +38,8 @@ export function parseArgv(argv: string[]): ParsedArgs {
   let noOpen = false;
   let verbose = false;
   let repo: string | null = null;
+  let client: string | null = null;
+  let dryRun = false;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -45,10 +51,14 @@ export function parseArgv(argv: string[]): ParsedArgs {
     if (arg === "stop") { command = "stop"; continue; }
     if (arg === "status") { command = "status"; continue; }
     if (arg === "mcp") { command = "mcp"; continue; }
+    if (arg === "install") { command = "install"; continue; }
+    if (arg === "uninstall") { command = "uninstall"; continue; }
+    if (arg === "doctor") { command = "doctor"; continue; }
     if (arg === "--help" || arg === "-h") { command = "help"; continue; }
     if (arg === "--version" || arg === "-v") { command = "version"; continue; }
     if (arg === "--no-open") { noOpen = true; continue; }
     if (arg === "--verbose") { verbose = true; continue; }
+    if (arg === "--dry-run") { dryRun = true; continue; }
 
     if (arg === "--port") {
       const next = args[++i] ?? "";
@@ -90,6 +100,16 @@ export function parseArgv(argv: string[]): ParsedArgs {
       continue;
     }
 
+    // --client <id> — only valid for install/uninstall subcommands
+    if (arg === "--client") {
+      client = args[++i] ?? null;
+      continue;
+    }
+    if (arg.startsWith("--client=")) {
+      client = arg.slice(9);
+      continue;
+    }
+
     // Unknown subcommand — treat as error
     if (!arg.startsWith("-")) {
       printError(`✗ unknown command: ${arg}`);
@@ -102,11 +122,11 @@ export function parseArgv(argv: string[]): ParsedArgs {
     process.exit(1);
   }
 
-  return { command, port, noOpen, verbose, repo };
+  return { command, port, noOpen, verbose, repo, client, dryRun };
 }
 
 async function main(): Promise<void> {
-  const { command, port, noOpen, verbose, repo } = parseArgv(process.argv);
+  const { command, port, noOpen, verbose, repo, client, dryRun } = parseArgv(process.argv);
   const cwd = process.cwd();
   const agbHome = process.env["AGB_HOME"] ?? join(homedir(), ".agentboard");
 
@@ -162,10 +182,57 @@ async function main(): Promise<void> {
       break;
     }
 
+    case "install": {
+      const { runInstall } = await import("./install-cmd.js");
+      const validClients = ["claude-code", "opencode", "copilot"] as const;
+      type ValidClient = typeof validClients[number];
+      const clientId = client && (validClients as readonly string[]).includes(client)
+        ? (client as ValidClient)
+        : client
+          ? (printError(`✗ unknown --client: ${client}. Valid values: claude-code, opencode, copilot`), process.exit(1) as never)
+          : null;
+      await runInstall({ clientId, dryRun });
+      process.exit(0);
+    }
+
+    case "uninstall": {
+      const { runUninstall } = await import("./install-cmd.js");
+      const validClients = ["claude-code", "opencode", "copilot"] as const;
+      type ValidClient = typeof validClients[number];
+      const clientId = client && (validClients as readonly string[]).includes(client)
+        ? (client as ValidClient)
+        : client
+          ? (printError(`✗ unknown --client: ${client}. Valid values: claude-code, opencode, copilot`), process.exit(1) as never)
+          : null;
+      await runUninstall({ clientId, dryRun });
+      process.exit(0);
+    }
+
+    case "doctor": {
+      const { runDoctor } = await import("./doctor.js");
+      await runDoctor({ agbHome });
+      process.exit(0);
+    }
+
     // "daemon" is an alias for "start" (REQ-L-02)
     // REQ-L-01: probe first — reuse an already-running daemon instead of crashing
+    // Special case: bare `agentboard` (no args → command === "start" by default).
+    // If stdout is a TTY → launch interactive TUI.
+    // If stdout is NOT a TTY → print help and exit 0 (non-interactive / piped context).
     case "daemon":
     case "start": {
+      const noArgs = process.argv.slice(2).length === 0;
+      if (command === "start" && noArgs) {
+        if (process.stdout.isTTY) {
+          const { runTui } = await import("./tui.js");
+          await runTui({ agbHome });
+          process.exit(0);
+        } else {
+          printHelp();
+          process.exit(0);
+        }
+      }
+
       const config = (await import("../config/load.js")).loadConfig(agbHome);
       const resolvedPort = port !== 0 ? port : config.server.port;
 

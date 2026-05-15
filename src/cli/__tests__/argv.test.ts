@@ -90,4 +90,33 @@ describe("parseArgv", () => {
       parseArgv(["node", "agentboard", "--port", "notaport"]),
     ).toThrow("process.exit(1)");
   });
+
+  it("parses install subcommand", () => {
+    const result = parseArgv(["node", "agentboard", "install"]);
+    expect(result.command).toBe("install");
+    expect(result.client).toBeNull();
+    expect(result.dryRun).toBe(false);
+  });
+
+  it("parses install --client claude-code", () => {
+    const result = parseArgv(["node", "agentboard", "install", "--client", "claude-code"]);
+    expect(result.command).toBe("install");
+    expect(result.client).toBe("claude-code");
+  });
+
+  it("parses install --dry-run", () => {
+    const result = parseArgv(["node", "agentboard", "install", "--dry-run"]);
+    expect(result.command).toBe("install");
+    expect(result.dryRun).toBe(true);
+  });
+
+  it("parses uninstall subcommand", () => {
+    const result = parseArgv(["node", "agentboard", "uninstall"]);
+    expect(result.command).toBe("uninstall");
+  });
+
+  it("parses doctor subcommand", () => {
+    const result = parseArgv(["node", "agentboard", "doctor"]);
+    expect(result.command).toBe("doctor");
+  });
 });
