@@ -30,6 +30,7 @@ function makeServices(db: Db): { services: McpServices; waiters: WaiterRegistry 
     broadcaster,
     activation,
     eventHooks: { listeners: [broadcaster.listener, waiters.listener] },
+    agentSeesHumanEvents: true,
   };
   return { services, waiters };
 }
