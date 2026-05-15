@@ -94,8 +94,16 @@ function connect(url: string): void {
   };
 }
 
+// Default URL targets the same host as the SPA so Vite proxies in dev
+// and the production server serves both on the same origin.
+function defaultWsUrl(): string {
+  if (typeof window === "undefined") return "ws://localhost:7733/ws";
+  const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+  return `${proto}//${window.location.host}/ws`;
+}
+
 // Starts the WS client. Idempotent if already started.
-export function startWs(url = "ws://localhost:7733/ws"): void {
+export function startWs(url: string = defaultWsUrl()): void {
   if (socket || retryTimer) return;
   stopped = false;
   connect(url);

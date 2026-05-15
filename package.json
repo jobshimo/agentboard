@@ -19,6 +19,7 @@
   "scripts": {
     "build": "tsc --project tsconfig.build.json && node scripts/copy-migrations.mjs",
     "build:web": "vite build --config src/web/vite.config.ts",
+    "dev:server": "tsx watch src/cli/index.ts",
     "dev:web": "vite dev --config src/web/vite.config.ts",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -39,14 +40,15 @@
     "@types/node": "^20.14.0",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
     "@vitest/coverage-v8": "^2.1.1",
     "jsdom": "^25.0.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-markdown": "^9.0.1",
+    "tsx": "^4.21.0",
     "typescript": "^5.5.3",
     "vite": "^5.4.0",
-    "@vitejs/plugin-react": "^4.3.1",
     "vitest": "^2.1.1"
   }
 }
