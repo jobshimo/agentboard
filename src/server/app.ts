@@ -74,7 +74,14 @@ export function buildApp(opts: AppOpts): FastifyInstance & { broadcaster: Broadc
   });
 
   registerRestRoutes(app, opts.db, { listeners: [broadcaster.listener, waiters.listener] });
-  registerWsRoute(app, broadcaster);
+
+  // The WS route MUST be registered inside a queued plugin so it runs AFTER
+  // @fastify/websocket. The plugin's onRoute hook only fires for routes
+  // registered after it loads — registering /ws at the parent scope (sync)
+  // means the hook never sees it and `{ websocket: true }` is ignored.
+  app.register(async (instance) => {
+    registerWsRoute(instance, broadcaster);
+  });
 
   // MCP transport: wire the activation state machine + install real tool handlers, then mount on /mcp
   const mcpServices = {
