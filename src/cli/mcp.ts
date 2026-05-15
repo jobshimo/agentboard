@@ -20,6 +20,7 @@ import { WaiterRegistry } from "../events/wait.js";
 import { BroadcastManager } from "../server/broadcaster.js";
 import { notifyDaemon } from "../mcp/notify-daemon.js";
 import { loadConfig } from "../config/load.js";
+import { probeAndMaybeSpawnDaemon } from "../mcp/auto-spawn.js";
 import type { McpServices } from "../mcp/tools/types.js";
 import type { EventListener } from "../events/insert.js";
 
@@ -112,6 +113,13 @@ export async function runMcp(opts: McpOpts): Promise<void> {
   // REQ-M-02: INSERT session row BEFORE connect so the session exists when
   // tools call poll_events/wait_for_event.
   activationState.activate(db, sessionId);
+
+  // Auto-spawn HTTP daemon for realtime WS push (fire-and-forget, non-blocking).
+  // If the daemon is already running or a foreign process holds the port, this is a no-op.
+  const daemonPort = parseInt(process.env["AGENTBOARD_PORT"] ?? "7733", 10);
+  probeAndMaybeSpawnDaemon({ port: daemonPort, agbHome: opts.agbHome }).catch(() => {
+    // Ignore — realtime push is best-effort
+  });
 
   // REQ-M-01: STDIO transport — no TCP binding
   const transport = new StdioServerTransport();
