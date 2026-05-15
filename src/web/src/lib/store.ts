@@ -5,7 +5,7 @@
 
 import { useSyncExternalStore } from "react";
 import type { ViewName, RouteMatch } from "../router/route";
-import type { CompactTask, TaskFull, SubtaskCompact, DiscussionEntry } from "./api";
+import type { CompactTask, TaskFull, SubtaskCompact, DiscussionEntry, WorkflowSummary, HealthInfo } from "./api";
 
 export type ConnectionState = "connected" | "reconnecting" | "offline";
 
@@ -29,10 +29,13 @@ export interface StoreState {
   // Task detail state — keyed by task id so navigating back/forward doesn't flash empty
   taskDetail: Record<string, TaskFull>;
   discussion: Record<string, DiscussionEntry[]>;
+  // Settings view state
+  workflows: WorkflowSummary[];
+  health: HealthInfo | null;
 }
 
-// Re-export types — consumers can import CompactTask, TaskFull, etc. from either api or store.
-export type { CompactTask, TaskFull, SubtaskCompact, DiscussionEntry };
+// Re-export types — consumers can import from either api or store.
+export type { CompactTask, TaskFull, SubtaskCompact, DiscussionEntry, WorkflowSummary, HealthInfo };
 
 type Listener = () => void;
 
@@ -47,6 +50,8 @@ let state: StoreState = {
   columnMode: "macro",
   taskDetail: {},
   discussion: {},
+  workflows: [],
+  health: null,
 };
 
 function getSnapshot(): StoreState {
@@ -77,7 +82,10 @@ export type Action =
   | { type: "SET_TASK_DETAIL"; task: TaskFull }
   | { type: "SET_DISCUSSION"; taskId: string; entries: DiscussionEntry[] }
   | { type: "APPEND_DISCUSSION_ENTRY"; taskId: string; entry: DiscussionEntry }
-  | { type: "UPSERT_SUBTASK"; taskId: string; subtask: SubtaskCompact };
+  | { type: "UPSERT_SUBTASK"; taskId: string; subtask: SubtaskCompact }
+  // S10d — settings actions
+  | { type: "SET_WORKFLOWS"; workflows: WorkflowSummary[] }
+  | { type: "SET_HEALTH"; health: HealthInfo };
 
 export function dispatch(action: Action): void {
   switch (action.type) {
@@ -123,6 +131,12 @@ export function dispatch(action: Action): void {
       }
       break;
     }
+    case "SET_WORKFLOWS":
+      state = { ...state, workflows: action.workflows };
+      break;
+    case "SET_HEALTH":
+      state = { ...state, health: action.health };
+      break;
   }
   notifyListeners();
 }
@@ -138,6 +152,8 @@ export function _resetStore(initial?: Partial<StoreState>): void {
     columnMode: "macro",
     taskDetail: {},
     discussion: {},
+    workflows: [],
+    health: null,
     ...initial,
   };
   // Do NOT notify — tests control when assertions run.
@@ -176,6 +192,15 @@ export function useTaskDetail(id: string): TaskFull | null {
 
 export function useDiscussion(id: string): DiscussionEntry[] {
   return useSyncExternalStore(subscribe, () => getSnapshot().discussion[id] ?? []);
+}
+
+// S10d — settings hooks
+export function useWorkflows(): WorkflowSummary[] {
+  return useSyncExternalStore(subscribe, () => getSnapshot().workflows);
+}
+
+export function useHealth(): HealthInfo | null {
+  return useSyncExternalStore(subscribe, () => getSnapshot().health);
 }
 
 // For non-React consumers (e.g. ws.ts needs to read current view).

@@ -218,7 +218,7 @@ Slices are ordered by dependency. Sequential constraints noted per slice.
 
 | # | Task | Commit | Spec refs |
 |---|------|--------|-----------|
-| 2.10d.1 | `src/web/src/views/Settings.tsx`: three sections — (1) Workflows list (`GET /api/workflows`), (2) MCP activation mode selector (lazy / always-on / prompt — PATCH config; server restart note), (3) Attention config toggles, (4) Export button (POST `/api/export`). Mirrors `agentboard/settings.jsx`. | `feat(web): Settings view — workflows, MCP, attention, export` | design §5.1, agentboard/settings.jsx, mcp-surface.md §activation modes |
+| 2.10d.1 | [x] `src/web/src/views/Settings.tsx`: three sections — (1) Workflows list (`GET /api/workflows`), (2) MCP activation mode selector (lazy / always-on / prompt — PATCH config; server restart note), (3) Attention config toggles, (4) Export button (POST `/api/export`). Mirrors `agentboard/settings.jsx`. | `feat(web): Settings view — workflows, MCP, attention, export` | design §5.1, agentboard/settings.jsx, mcp-surface.md §activation modes |
 
 ---
 

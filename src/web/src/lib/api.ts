@@ -128,3 +128,44 @@ export function postFeedback(taskId: string, payload: FeedbackPayload): Promise<
 export function postCustomSubtask(taskId: string, label: string, type?: string): Promise<SubtaskCompact> {
   return apiPost<SubtaskCompact>(`/api/tasks/${encodeURIComponent(taskId)}/subtasks`, { label, type });
 }
+
+// S10d — Settings view types and fetchers
+
+export interface WorkflowStep {
+  id: string;
+  label: string;
+  type: string;
+  requires_human?: boolean;
+  can_agent_complete_alone?: boolean;
+}
+
+export interface WorkflowSummary {
+  id: string;
+  label: string;
+  description?: string;
+  steps: WorkflowStep[];
+}
+
+export interface HealthInfo {
+  ok: boolean;
+  version: string;
+  uptime_ms: number;
+}
+
+export interface ExportResult {
+  ok: boolean;
+  count: number;
+  path: string;
+}
+
+export function fetchWorkflows(): Promise<WorkflowSummary[]> {
+  return apiGet<WorkflowSummary[]>("/api/workflows");
+}
+
+export function fetchHealth(): Promise<HealthInfo> {
+  return apiGet<HealthInfo>("/api/health");
+}
+
+export function postExport(): Promise<ExportResult> {
+  return apiPost<ExportResult>("/api/export", {});
+}

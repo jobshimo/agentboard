@@ -69,6 +69,7 @@ export const WifiOff       = (p: IconProps) => <Icon {...p}><path d="M2 6a8 8 0 
 export const MoreH         = (p: IconProps) => <Icon {...p}><circle cx="4" cy="8" r=".7" fill="currentColor"/><circle cx="8" cy="8" r=".7" fill="currentColor"/><circle cx="12" cy="8" r=".7" fill="currentColor"/></Icon>;
 export const Sparkle       = (p: IconProps) => <Icon {...p}><path d="M8 2.5v3M8 10.5v3M2.5 8h3M10.5 8h3M4.5 4.5l1.5 1.5M10 10l1.5 1.5M4.5 11.5L6 10M10 6l1.5-1.5"/></Icon>;
 export const Send          = (p: IconProps) => <Icon {...p}><path d="M13.5 2.5L2 8l5 1.5L8.5 14z"/><path d="M13.5 2.5L7 9.5"/></Icon>;
+export const Cube          = (p: IconProps) => <Icon {...p}><path d="M8 2l5.5 3v6L8 14 2.5 11V5z"/><path d="M2.5 5L8 8m0 0l5.5-3M8 8v6"/></Icon>;
 
 // Origin glyphs
 export const GitHubMark = ({ sz = 12 }: { sz?: number }) => (
