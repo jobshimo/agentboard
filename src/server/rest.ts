@@ -12,7 +12,7 @@ import {
   recomputeTaskStatus,
   type SubtaskRow,
 } from "../domain/subtask.js";
-import { insertEvent } from "../events/insert.js";
+import { insertEvent, type InsertEventHooks } from "../events/insert.js";
 import { findWorkflowById } from "../workflows/find.js";
 import { resolveWorkflowPaths } from "../workflows/discovery.js";
 import { loadWorkflowFile } from "../workflows/load.js";
@@ -172,7 +172,7 @@ const AddFeedbackBody = z.object({
 // Route handlers
 // ---------------------------------------------------------------------------
 
-function registerTaskRoutes(app: FastifyInstance, db: Db): void {
+function registerTaskRoutes(app: FastifyInstance, db: Db, hooks: InsertEventHooks): void {
   app.get("/api/tasks", async (_req, reply) => {
     const rows = db
       .prepare("SELECT * FROM tasks ORDER BY created_at DESC")
@@ -286,7 +286,7 @@ function registerTaskRoutes(app: FastifyInstance, db: Db): void {
       type: "comment_added",
       payload: { body: parsed.data.body },
       origin: "human",
-    });
+    }, hooks);
 
     const result = getEntries(db, id);
     const entries = result.type === "entries" ? result.entries : [];
@@ -313,7 +313,7 @@ function registerTaskRoutes(app: FastifyInstance, db: Db): void {
       type: "custom_subtask_added",
       payload: { subtask_id: subtask.id, label },
       origin: "human",
-    });
+    }, hooks);
 
     reply.status(201).send(toSubtaskResponse(subtask));
   });
@@ -334,13 +334,13 @@ function registerTaskRoutes(app: FastifyInstance, db: Db): void {
       type: "feedback_added",
       payload: { target, text, severity },
       origin: "human",
-    });
+    }, hooks);
 
     reply.status(201).send({ ok: true, event_id: eventId });
   });
 }
 
-function registerSubtaskRoutes(app: FastifyInstance, db: Db): void {
+function registerSubtaskRoutes(app: FastifyInstance, db: Db, hooks: InsertEventHooks): void {
   app.patch("/api/subtasks/:id", async (req, reply) => {
     const { id } = req.params as { id: string };
     const parsed = PatchSubtaskBody.safeParse(req.body);
@@ -373,7 +373,7 @@ function registerSubtaskRoutes(app: FastifyInstance, db: Db): void {
         type: "subtask_updated",
         payload: { subtask_id: id, status },
         origin: "human",
-      });
+      }, hooks);
       recomputeTaskStatus(db, current.task_id);
     }
 
@@ -447,9 +447,9 @@ function registerExportRoute(app: FastifyInstance, db: Db): void {
 // Plugin registration
 // ---------------------------------------------------------------------------
 
-export function registerRestRoutes(app: FastifyInstance, db: Db): void {
-  registerTaskRoutes(app, db);
-  registerSubtaskRoutes(app, db);
+export function registerRestRoutes(app: FastifyInstance, db: Db, hooks: InsertEventHooks = {}): void {
+  registerTaskRoutes(app, db, hooks);
+  registerSubtaskRoutes(app, db, hooks);
   registerWorkflowRoutes(app);
   registerExportRoute(app, db);
 }

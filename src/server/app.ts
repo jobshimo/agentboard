@@ -4,6 +4,8 @@ import fastifyWebsocket from "@fastify/websocket";
 import type Database from "better-sqlite3";
 import { toHttpError } from "./errors.js";
 import { registerRestRoutes } from "./rest.js";
+import { registerWsRoute } from "./ws.js";
+import { BroadcastManager } from "./broadcaster.js";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { join, dirname } from "node:path";
@@ -30,10 +32,13 @@ function readVersion(): string {
 
 const startedAt = Date.now();
 
-export function buildApp(opts: AppOpts): FastifyInstance {
+export function buildApp(opts: AppOpts): FastifyInstance & { broadcaster: BroadcastManager } {
   const app = Fastify({
     logger: opts.logger ?? false,
-  });
+  }) as FastifyInstance & { broadcaster: BroadcastManager };
+
+  const broadcaster = new BroadcastManager();
+  app.broadcaster = broadcaster;
 
   app.register(fastifyWebsocket);
 
@@ -50,7 +55,8 @@ export function buildApp(opts: AppOpts): FastifyInstance {
     });
   });
 
-  registerRestRoutes(app, opts.db);
+  registerRestRoutes(app, opts.db, { listeners: [broadcaster.listener] });
+  registerWsRoute(app, broadcaster);
 
   return app;
 }
