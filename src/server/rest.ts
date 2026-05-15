@@ -21,6 +21,7 @@ import {
   type SubtaskRow,
 } from "../domain/subtask.js";
 import { insertEvent, type InsertEventHooks } from "../events/insert.js";
+import { addFeedback } from "../feedback/add.js";
 import { findWorkflowById } from "../workflows/find.js";
 import { resolveWorkflowPaths } from "../workflows/discovery.js";
 import { loadWorkflowFile } from "../workflows/load.js";
@@ -302,15 +303,10 @@ function registerTaskRoutes(app: FastifyInstance, db: Db, hooks: InsertEventHook
     }
     if (!getTask(db, id)) throw new NotFoundError("task", id);
 
-    const { target, text, severity = "info" } = parsed.data;
-    const eventId = insertEvent(db, {
-      taskId: id,
-      type: "feedback_added",
-      payload: { target, text, severity },
-      origin: "human",
-    }, hooks);
+    const { target, text, severity } = parsed.data;
+    const result = addFeedback(db, { target, taskId: id, text, severity, origin: "human", hooks });
 
-    reply.status(201).send({ ok: true, event_id: eventId });
+    reply.status(201).send(result);
   });
 }
 

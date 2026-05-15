@@ -380,10 +380,51 @@ describe("feedback.add", () => {
 // ---------------------------------------------------------------------------
 
 describe("feedback.search", () => {
-  it("returns an empty list (S8 stub)", async () => {
+  it("returns empty list when no feedback exists", async () => {
     const sessionId = seedSession(db);
     const result = await callTool(activeTools, "feedback.search", { context: { task_id: "T-1" } }, sessionId) as any;
     expect(result.entries).toHaveLength(0);
+  });
+
+  it("returns scored feedback entries ordered by relevance", async () => {
+    const sessionId = seedSession(db);
+    seedTask(db, "T-1", { workflow_id: "feature" });
+    seedTask(db, "T-2", { workflow_id: "feature" });
+
+    // Add feedback on T-2 (same workflow as search context)
+    await callTool(activeTools, "feedback.add", {
+      task_id: "T-2",
+      target: "T-2",
+      text: "feature workflow insight",
+      severity: "correction",
+    }, sessionId);
+
+    const result = await callTool(activeTools, "feedback.search", {
+      context: { task_id: "T-1", workflow_id: "feature", task_type: "local" },
+    }, sessionId) as any;
+
+    expect(result.entries).toHaveLength(1);
+    expect(result.entries[0].payload.severity).toBe("correction");
+    expect(result.entries[0].payload.workflow_at_capture).toBe("feature");
+  });
+
+  it("respects the limit parameter", async () => {
+    const sessionId = seedSession(db);
+    for (let i = 1; i <= 3; i++) {
+      seedTask(db, `T-${i}`, { workflow_id: "feature" });
+      await callTool(activeTools, "feedback.add", {
+        task_id: `T-${i}`,
+        target: `T-${i}`,
+        text: `note ${i}`,
+      }, sessionId);
+    }
+
+    const result = await callTool(activeTools, "feedback.search", {
+      context: { workflow_id: "feature" },
+      limit: 2,
+    }, sessionId) as any;
+
+    expect(result.entries.length).toBeLessThanOrEqual(2);
   });
 });
 

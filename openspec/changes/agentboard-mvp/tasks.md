@@ -140,10 +140,10 @@ Slices are ordered by dependency. Sequential constraints noted per slice.
 
 | # | Task | Commit | Spec refs |
 |---|------|--------|-----------|
-| 2.8.1 | `src/feedback/add.ts`: `addFeedback(db, {target, text, severity})` — validates severity ∈ `info \| correction \| failed_in_practice`; inserts `feedback_added` event via `insertEvent`. Returns `{ok: true, event_id}`. Closed tasks remain feedbackable. | `feat(feedback): feedback.add with event insert` | feedback.md §feedback.add, design §4.3 |
-| 2.8.2 | `src/feedback/score.ts`: pure `score(feedback, context): number` — weighted formula from design §2.13 (`3×workflow_match + 3×file_overlap + 2×task_type + 1×keyword + severity_boost + recency_decay(half_life=14d)`). No DB calls. | `feat(feedback): pure scoring function` | feedback.md §relevance, design §2.13 |
-| 2.8.3 | `src/feedback/search.ts`: `searchFeedback(db, context, limit?)` — queries `feedback_added` events from `events` table; scores each with `score.ts`; filters same-task unless `include_same_task`; sorts `score DESC, created_at DESC`; returns top N (default 5, max 50). | `feat(feedback): feedback.search heuristic v1` | feedback.md §feedback.search, design §2.13 |
-| 2.8.4 | Tests: `src/feedback/__tests__/score.test.ts` — workflow match adds 3; severity boost correct; recency decay near-zero for old entries. `src/feedback/__tests__/search.test.ts` — with 3 seeded feedback entries, correct order returned; same-task filter works; limit respected. | `test(feedback): score and search` | feedback.md invariants |
+| 2.8.1 | [x] `src/feedback/add.ts`: `addFeedback(db, {target, text, severity})` — validates severity ∈ `info \| correction \| failed_in_practice`; inserts `feedback_added` event via `insertEvent`. Returns `{ok: true, event_id}`. Closed tasks remain feedbackable. | `feat(feedback): feedback.add with event insert` | feedback.md §feedback.add, design §4.3 |
+| 2.8.2 | [x] `src/feedback/score.ts`: pure `score(feedback, context): number` — weighted formula from design §2.13 (`3×workflow_match + 3×file_overlap + 2×task_type + 1×keyword + severity_boost + recency_decay(half_life=14d)`). No DB calls. | `feat(feedback): pure scoring function` | feedback.md §relevance, design §2.13 |
+| 2.8.3 | [x] `src/feedback/search.ts`: `searchFeedback(db, context, limit?)` — queries `feedback_added` events from `events` table; scores each with `score.ts`; filters same-task unless `include_same_task`; sorts `score DESC, created_at DESC`; returns top N (default 5, max 50). | `feat(feedback): feedback.search heuristic v1` | feedback.md §feedback.search, design §2.13 |
+| 2.8.4 | [x] Tests: `src/feedback/__tests__/score.test.ts` — workflow match adds 3; severity boost correct; recency decay near-zero for old entries. `src/feedback/__tests__/search.test.ts` — with 3 seeded feedback entries, correct order returned; same-task filter works; limit respected. | `test(feedback): score and search` | feedback.md invariants |
 
 ---
 
