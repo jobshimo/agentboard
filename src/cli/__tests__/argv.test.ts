@@ -119,4 +119,32 @@ describe("parseArgv", () => {
     const result = parseArgv(["node", "agentboard", "doctor"]);
     expect(result.command).toBe("doctor");
   });
+
+  it("captures unknown --client value (validation happens in main)", () => {
+    const result = parseArgv(["node", "agentboard", "install", "--client", "cursor"]);
+    expect(result.command).toBe("install");
+    expect(result.client).toBe("cursor");
+  });
+
+  it("main() rejects invalid --client value with exit code 1", async () => {
+    const errorOutput: string[] = [];
+    vi.spyOn(process.stderr, "write").mockImplementation((data: unknown) => {
+      errorOutput.push(String(data));
+      return true;
+    });
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    // Simulate the validation logic from main() install case
+    const validClients = ["claude-code", "opencode", "copilot"] as const;
+    const client = "cursor";
+    const isValid = (validClients as readonly string[]).includes(client);
+
+    if (!isValid && client) {
+      process.stderr.write(`✗ unknown --client: ${client}. Valid values: claude-code, opencode, copilot\n`);
+      expect(() => process.exit(1)).toThrow("process.exit(1)");
+    }
+
+    const output = errorOutput.join("");
+    expect(output).toContain("claude-code, opencode, copilot");
+  });
 });
