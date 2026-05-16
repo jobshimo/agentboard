@@ -21,7 +21,7 @@ function discoverMigrations(): MigrationFile[] {
   for (const entry of entries) {
     if (!entry.endsWith(".sql")) continue;
     const match = entry.match(/^(\d{4})/);
-    if (!match) continue;
+    if (!match || !match[1]) continue;
     const version = parseInt(match[1], 10);
     migrations.push({ version, path: join(MIGRATIONS_DIR, entry) });
   }

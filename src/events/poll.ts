@@ -55,7 +55,9 @@ export function pollEvents(db: Db, sessionId: string, taskId?: string): PollResu
   const events = rows.map(toInsertedEvent);
 
   if (events.length > 0) {
-    const newCursor = events[events.length - 1].id;
+    const last = events[events.length - 1];
+    if (!last) return { events: [], cursor };
+    const newCursor = last.id;
     advanceCursor(db, sessionId, newCursor);
     return { events, cursor: newCursor };
   }
