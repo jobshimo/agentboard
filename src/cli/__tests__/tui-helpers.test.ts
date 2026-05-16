@@ -6,6 +6,7 @@ import {
   registryRowsFromReport,
 } from "../tui-helpers.js";
 import type { DoctorReport } from "../doctor-report.js";
+import { buildDaemonSpawnArgs } from "../tui.js";
 
 describe("buildMenuItems", () => {
   it("returns an array of menu items with labels and values", () => {
@@ -55,6 +56,24 @@ describe("toggleLanguage", () => {
     const state: TuiState = { lang: "es", agbHome: "/tmp/agb" };
     const next = toggleLanguage(state);
     expect(next.lang).toBe("en");
+  });
+});
+
+describe("buildDaemonSpawnArgs", () => {
+  it("includes 'daemon' in the spawn args", () => {
+    const { execPath, args } = buildDaemonSpawnArgs("/tmp/agb");
+    expect(execPath).toBe(process.execPath);
+    expect(args).toContain("daemon");
+  });
+
+  it("includes --no-open in the spawn args", () => {
+    const { args } = buildDaemonSpawnArgs("/tmp/agb");
+    expect(args).toContain("--no-open");
+  });
+
+  it("first arg is a path ending in index.js", () => {
+    const { args } = buildDaemonSpawnArgs("/tmp/agb");
+    expect(args[0]).toMatch(/index\.js$/);
   });
 });
 

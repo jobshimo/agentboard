@@ -5,15 +5,30 @@
 import React, { useState, useCallback } from "react";
 import { render, Box, Text, useApp, useInput } from "ink";
 import SelectInput from "ink-select-input";
-import { exec } from "node:child_process";
+import { spawn } from "node:child_process";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { buildMenuItems, toggleLanguage, type TuiState } from "./tui-helpers.js";
 import { readLanguage, writeLanguage } from "../i18n/lang-config.js";
 import { t } from "../i18n/strings.js";
 import { runInstall, runUninstall } from "./install-cmd.js";
-import { runStart } from "./start.js";
 import { buildDoctorReport, formatDoctorReport } from "./doctor-report.js";
 import { checkForUpdate } from "./update-check.js";
 import { getVersion } from "./version.js";
+
+/** Build the args needed to spawn the daemon as a detached child. Exported for testing. */
+export function buildDaemonSpawnArgs(agbHome: string): { execPath: string; args: string[] } {
+  const entryPath = join(dirname(fileURLToPath(import.meta.url)), "index.js");
+  return {
+    execPath: process.execPath,
+    args: [entryPath, "daemon", "--no-open", `--`],
+  };
+}
+
+/** Returns env overrides needed by the daemon child process. */
+function daemonEnv(agbHome: string): NodeJS.ProcessEnv {
+  return { ...process.env, AGB_HOME: agbHome };
+}
 
 export interface TuiOptions {
   agbHome: string;
@@ -68,14 +83,17 @@ function App({ agbHome, initialLang }: AppProps): React.ReactElement {
           break;
 
         case "start-daemon": {
-          setLoading(true);
           try {
-            await runStart({ port: 0, noOpen: false, verbose: false, cwd: process.cwd() });
-            showMessage(t("tui.daemon_started", lang));
+            const { execPath, args } = buildDaemonSpawnArgs(agbHome);
+            const child = spawn(execPath, args, {
+              detached: true,
+              stdio: "ignore",
+              env: daemonEnv(agbHome),
+            });
+            child.unref();
+            showMessage(t("tui.daemon_started_pid", lang).replace("{pid}", String(child.pid ?? "?")));
           } catch (e) {
             showMessage(`Error: ${e instanceof Error ? e.message : String(e)}`);
-          } finally {
-            setLoading(false);
           }
           break;
         }

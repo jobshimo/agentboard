@@ -20,6 +20,7 @@ export const en = {
   // TUI status messages
   "tui.daemon_starting": "Starting daemon…",
   "tui.daemon_started": "Daemon started.",
+  "tui.daemon_started_pid": "Daemon started (PID {pid}).",
   "tui.daemon_already_running": "Daemon already running.",
   "tui.opening_browser": "Opening browser…",
   "tui.no_projects": "No projects yet — open a repo with the agent or run `agentboard daemon` from a project root.",
@@ -81,6 +82,7 @@ export const es: Record<StringKey, string> = {
   // TUI status messages
   "tui.daemon_starting": "Iniciando daemon…",
   "tui.daemon_started": "Daemon iniciado.",
+  "tui.daemon_started_pid": "Daemon iniciado (PID {pid}).",
   "tui.daemon_already_running": "El daemon ya está en ejecución.",
   "tui.opening_browser": "Abriendo navegador…",
   "tui.no_projects": "Sin proyectos aún — abrí un repo con el agente o ejecutá `agentboard daemon` desde la raíz del proyecto.",
