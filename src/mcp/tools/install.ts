@@ -33,9 +33,14 @@ export function installTool(
 
   // The SDK's update() accepts paramsSchema as ZodRawShapeCompat (= Record<string, ZodTypeAny>)
   // and callback as ToolCallback. We cast both since our local types are structurally identical.
+  // The SDK's update() arg type uses exactOptionalPropertyTypes which requires
+  // conditional spreading for optional fields. Since we always provide all three
+  // values and they are structurally compatible, we cast through unknown.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   tool.update({
     description: config.description,
-    paramsSchema: config.paramsSchema as Parameters<RegisteredTool["update"]>[0]["paramsSchema"],
-    callback: config.callback as Parameters<RegisteredTool["update"]>[0]["callback"],
+    paramsSchema: config.paramsSchema as any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    callback: config.callback as any,
   });
 }

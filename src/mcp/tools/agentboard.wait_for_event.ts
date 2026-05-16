@@ -24,10 +24,11 @@ export function installWaitForEventTool(
       const sessionId = extra.sessionId ?? services.mintedSessionId;
       if (!sessionId) throw new ValidationError("session_id is required for wait_for_event — call agentboard.activate() first");
 
+      const typedTypes = args.types as EventType[] | undefined;
       const event = await waiters.register(db, sessionId, {
         timeoutMs: args.timeout_ms,
-        taskId: args.task_id,
-        types: args.types as EventType[] | undefined,
+        ...(args.task_id !== undefined ? { taskId: args.task_id as string } : {}),
+        ...(typedTypes !== undefined ? { types: typedTypes } : {}),
       });
 
       const result = { event };

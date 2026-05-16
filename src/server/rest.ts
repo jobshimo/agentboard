@@ -256,12 +256,12 @@ function registerTaskRoutes(app: FastifyInstance, broadcaster: BroadcastManager,
           title,
           workflowId: workflow_id,
           workflowSnapshot: snapshotJson,
-          refSource: ref.source,
-          refId: ref.id,
-          refUrl: ref.url,
-          refTitle: ref.title,
-          refStatus: ref.status,
-          refAssignee: ref.assignee,
+          ...(ref.source !== undefined ? { refSource: ref.source } : {}),
+          ...(ref.id !== undefined ? { refId: ref.id } : {}),
+          ...(ref.url !== undefined ? { refUrl: ref.url } : {}),
+          ...(ref.title !== undefined ? { refTitle: ref.title } : {}),
+          ...(ref.status !== undefined ? { refStatus: ref.status } : {}),
+          ...(ref.assignee !== undefined ? { refAssignee: ref.assignee } : {}),
         })
       : createLocal(req.db, {
           title,
@@ -314,7 +314,7 @@ function registerTaskRoutes(app: FastifyInstance, broadcaster: BroadcastManager,
     if (!getTask(req.db, id)) throw new NotFoundError("task", id);
 
     const { label, type: subtaskType } = parsed.data;
-    const subtask = addCustomSubtask(req.db, id, { label, type: subtaskType });
+    const subtask = addCustomSubtask(req.db, id, { label, ...(subtaskType !== undefined ? { type: subtaskType } : {}) });
 
     const hooks = getHooks(req);
     insertEvent(req.db, {
@@ -339,7 +339,7 @@ function registerTaskRoutes(app: FastifyInstance, broadcaster: BroadcastManager,
 
     const { target, text, severity } = parsed.data;
     const hooks = getHooks(req);
-    const result = addFeedback(req.db, { target, taskId: id, text, severity, origin: "human", hooks });
+    const result = addFeedback(req.db, { target, taskId: id, text, ...(severity !== undefined ? { severity } : {}), origin: "human", hooks });
 
     reply.status(201).send(result);
   });
@@ -387,7 +387,7 @@ function registerSubtaskRoutes(app: FastifyInstance, broadcaster: BroadcastManag
         insertEvent(req.db, { taskId: current.task_id, type: ev.type, payload: ev.payload, origin: "human" }, hooks, req.repoRoot);
       }
     } else {
-      updated = applySubtaskUpdate(req.db, id, { note });
+      updated = applySubtaskUpdate(req.db, id, { ...(note !== undefined ? { note } : {}) });
       insertEvent(req.db, {
         taskId: current.task_id,
         type: "subtask_updated",

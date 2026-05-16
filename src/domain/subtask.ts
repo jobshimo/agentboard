@@ -177,7 +177,7 @@ export function applyStatusTransition(
       | undefined
   )?.derived_status;
 
-  const updatedRow = applySubtaskUpdate(db, subtaskId, { status: toStatus, note });
+  const updatedRow = applySubtaskUpdate(db, subtaskId, { status: toStatus, ...(note !== undefined ? { note } : {}) });
   const nextDerived = recomputeTaskStatus(db, taskId);
 
   const events: TransitionEvent[] = [
