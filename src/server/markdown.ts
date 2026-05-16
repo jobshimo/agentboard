@@ -2,7 +2,7 @@ import type { DiscussionEntry } from "../domain/discussion.js";
 
 export interface SubtaskView {
   id: string;
-  label: string;
+  label: string | null;
   status: string;
   note: string | null;
   custom: boolean;
@@ -69,7 +69,7 @@ function renderSubtasks(subtasks: SubtaskView[]): string {
   for (const s of subtasks) {
     const glyph = statusGlyph(s.status);
     const custom = s.custom ? " *(custom)*" : "";
-    lines.push(`- ${glyph} **${s.label}**${custom} \`${s.status}\``);
+    lines.push(`- ${glyph} **${s.label ?? ""}**${custom} \`${s.status}\``);
     if (s.note) {
       lines.push(`  > ${s.note}`);
     }
