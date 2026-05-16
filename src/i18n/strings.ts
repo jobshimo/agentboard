@@ -41,6 +41,19 @@ export const en = {
   "install.dry_run": "[dry-run] would install: {client} → {file}",
   "install.no_clients_detected": "No supported MCP clients detected. Install Claude Code, OpenCode, or GitHub Copilot first.",
 
+  // Install diagnostics (printed during install/uninstall operations)
+  "install.diag.backup": "  backup: {path}",
+  "install.diag.instr_block": "  instructions block ({id}): {status}",
+  "install.diag.instr_backup": "  instructions backup: {path}",
+  "install.diag.dry_run_install": "  [dry-run] would install instructions block v{version} → {path}",
+  "install.diag.auto_instr_block": "  [{id}] instructions block: {status}",
+  "install.diag.auto_instr_backup": "  [{id}] instructions backup: {path}",
+  "install.diag.auto_dry_run_install": "  [{id}] [dry-run] would install instructions block v{version} → {path}",
+  "uninstall.diag.instr_block": "  instructions block ({id}): {status}",
+  "uninstall.diag.dry_run_remove": "  [dry-run] would remove instructions block → {path}",
+  "uninstall.diag.auto_instr_block": "  [{id}] instructions block: {status}",
+  "uninstall.diag.auto_dry_run_remove": "  [{id}] [dry-run] would remove instructions block → {path}",
+
   // Uninstall sub-menu
   "uninstall.menu.title": "Uninstall MCP — select client",
   "uninstall.success": "Uninstalled: {client}",
@@ -125,6 +138,19 @@ export const es: Record<StringKey, string> = {
   "install.already": "Ya instalado: {client}",
   "install.dry_run": "[dry-run] instalaría: {client} → {file}",
   "install.no_clients_detected": "No se detectaron clientes MCP. Instalá Claude Code, OpenCode o GitHub Copilot primero.",
+
+  // Install diagnostics (printed during install/uninstall operations)
+  "install.diag.backup": "  respaldo: {path}",
+  "install.diag.instr_block": "  bloque de instrucciones ({id}): {status}",
+  "install.diag.instr_backup": "  respaldo de instrucciones: {path}",
+  "install.diag.dry_run_install": "  [dry-run] instalaría bloque de instrucciones v{version} → {path}",
+  "install.diag.auto_instr_block": "  [{id}] bloque de instrucciones: {status}",
+  "install.diag.auto_instr_backup": "  [{id}] respaldo de instrucciones: {path}",
+  "install.diag.auto_dry_run_install": "  [{id}] [dry-run] instalaría bloque de instrucciones v{version} → {path}",
+  "uninstall.diag.instr_block": "  bloque de instrucciones ({id}): {status}",
+  "uninstall.diag.dry_run_remove": "  [dry-run] eliminaría bloque de instrucciones → {path}",
+  "uninstall.diag.auto_instr_block": "  [{id}] bloque de instrucciones: {status}",
+  "uninstall.diag.auto_dry_run_remove": "  [{id}] [dry-run] eliminaría bloque de instrucciones → {path}",
 
   // Uninstall sub-menu
   "uninstall.menu.title": "Desinstalar MCP — seleccioná cliente",

@@ -56,6 +56,11 @@ export interface InstallCmdOptions {
   lang?: "en" | "es";
 }
 
+/** Simple template substitution: replace `{key}` placeholders with values. */
+function sub(template: string, vars: Record<string, string>): string {
+  return template.replace(/\{(\w+)\}/g, (_, k) => vars[k as string] ?? `{${k}}`);
+}
+
 /** Run `agentboard install [--client <id>] [--dry-run]`. */
 export async function runInstall(opts: InstallCmdOptions): Promise<void> {
   const { clientId, dryRun, adapterOverrides = {}, instructionsOverrides = {}, lang = "en" } = opts;
@@ -69,16 +74,16 @@ export async function runInstall(opts: InstallCmdOptions): Promise<void> {
     const result = await adapter.install(installOpts);
     printLine(result.message);
     if (result.backupPath) {
-      printLine(`  backup: ${result.backupPath}`);
+      printLine(sub(t("install.diag.backup", lang), { path: result.backupPath }));
     }
     if (!dryRun) {
       const instrResult = await installInstructionsBlock(resolveInstrPath(clientId));
-      printLine(`  instructions block (${clientId}): ${instrResult.status}`);
+      printLine(sub(t("install.diag.instr_block", lang), { id: clientId, status: instrResult.status }));
       if (instrResult.backupPath) {
-        printLine(`  instructions backup: ${instrResult.backupPath}`);
+        printLine(sub(t("install.diag.instr_backup", lang), { path: instrResult.backupPath }));
       }
     } else {
-      printLine(`  [dry-run] would install instructions block v${INSTRUCTIONS_VERSION} → ${resolveInstrPath(clientId)}`);
+      printLine(sub(t("install.diag.dry_run_install", lang), { version: INSTRUCTIONS_VERSION, path: resolveInstrPath(clientId) }));
     }
     return;
   }
@@ -93,16 +98,16 @@ export async function runInstall(opts: InstallCmdOptions): Promise<void> {
     const result = await adapter.install(installOpts);
     printLine(`[${id}] ${result.message}`);
     if (result.backupPath) {
-      printLine(`  backup: ${result.backupPath}`);
+      printLine(sub(t("install.diag.backup", lang), { path: result.backupPath }));
     }
     if (!dryRun) {
       const instrResult = await installInstructionsBlock(resolveInstrPath(id));
-      printLine(`  [${id}] instructions block: ${instrResult.status}`);
+      printLine(sub(t("install.diag.auto_instr_block", lang), { id, status: instrResult.status }));
       if (instrResult.backupPath) {
-        printLine(`  [${id}] instructions backup: ${instrResult.backupPath}`);
+        printLine(sub(t("install.diag.auto_instr_backup", lang), { id, path: instrResult.backupPath }));
       }
     } else {
-      printLine(`  [${id}] [dry-run] would install instructions block v${INSTRUCTIONS_VERSION} → ${resolveInstrPath(id)}`);
+      printLine(sub(t("install.diag.auto_dry_run_install", lang), { id, version: INSTRUCTIONS_VERSION, path: resolveInstrPath(id) }));
     }
     installedAny = true;
   }
@@ -135,13 +140,13 @@ export async function runUninstall(opts: UninstallCmdOptions): Promise<void> {
     const result = await adapter.uninstall(installOpts);
     printLine(result.message);
     if (result.backupPath) {
-      printLine(`  backup: ${result.backupPath}`);
+      printLine(sub(t("install.diag.backup", lang), { path: result.backupPath }));
     }
     if (!dryRun) {
       const instrResult = await uninstallInstructionsBlock(resolveInstrPath(clientId));
-      printLine(`  instructions block (${clientId}): ${instrResult.status}`);
+      printLine(sub(t("uninstall.diag.instr_block", lang), { id: clientId, status: instrResult.status }));
     } else {
-      printLine(`  [dry-run] would remove instructions block → ${resolveInstrPath(clientId)}`);
+      printLine(sub(t("uninstall.diag.dry_run_remove", lang), { path: resolveInstrPath(clientId) }));
     }
     return;
   }
@@ -156,13 +161,13 @@ export async function runUninstall(opts: UninstallCmdOptions): Promise<void> {
     const result = await adapter.uninstall(installOpts);
     printLine(`[${id}] ${result.message}`);
     if (result.backupPath) {
-      printLine(`  backup: ${result.backupPath}`);
+      printLine(sub(t("install.diag.backup", lang), { path: result.backupPath }));
     }
     if (!dryRun) {
       const instrResult = await uninstallInstructionsBlock(resolveInstrPath(id));
-      printLine(`  [${id}] instructions block: ${instrResult.status}`);
+      printLine(sub(t("uninstall.diag.auto_instr_block", lang), { id, status: instrResult.status }));
     } else {
-      printLine(`  [${id}] [dry-run] would remove instructions block → ${resolveInstrPath(id)}`);
+      printLine(sub(t("uninstall.diag.auto_dry_run_remove", lang), { id, path: resolveInstrPath(id) }));
     }
     removedAny = true;
   }

@@ -148,6 +148,62 @@ describe("runInstall", () => {
   });
 });
 
+describe("install diagnostic strings i18n (lang param)", () => {
+  it("dry-run single client: output contains translated dry-run message when lang=es", async () => {
+    const claudeConfigPath = join(tmpDir, ".claude.json");
+    const claudeInstrPath = join(tmpDir, "CLAUDE.md");
+
+    const captured: string[] = [];
+    const spy = vi.spyOn(process.stdout, "write").mockImplementation((data: unknown) => {
+      captured.push(String(data));
+      return true;
+    });
+
+    const { runInstall } = await import("../install-cmd.js");
+    await runInstall({
+      clientId: "claude-code",
+      dryRun: true,
+      lang: "es",
+      adapterOverrides: { "claude-code": claudeConfigPath },
+      instructionsOverrides: { "claude-code": claudeInstrPath },
+    });
+
+    spy.mockRestore();
+    const all = captured.join("");
+    // Spanish dry-run diagnostic must appear
+    expect(all).toContain("instalaría bloque de instrucciones");
+  });
+
+  it("install single client with backup: output contains translated backup label when lang=es", async () => {
+    const claudeConfigPath = join(tmpDir, ".claude.json");
+    const claudeInstrPath = join(tmpDir, "CLAUDE.md");
+    // Pre-create config with existing MCP so a backup is triggered
+    writeFileSync(claudeConfigPath, JSON.stringify({ mcpServers: { agentboard: { type: "stdio", command: "npx" } } }));
+
+    const captured: string[] = [];
+    const spy = vi.spyOn(process.stdout, "write").mockImplementation((data: unknown) => {
+      captured.push(String(data));
+      return true;
+    });
+
+    const { runInstall } = await import("../install-cmd.js");
+    await runInstall({
+      clientId: "claude-code",
+      dryRun: false,
+      lang: "es",
+      adapterOverrides: { "claude-code": claudeConfigPath },
+      instructionsOverrides: { "claude-code": claudeInstrPath },
+    });
+
+    spy.mockRestore();
+    const all = captured.join("");
+    // Spanish backup label must appear (backup file was written from the update)
+    expect(all).toContain("respaldo:");
+    // Spanish instructions block diagnostic must appear
+    expect(all).toContain("bloque de instrucciones");
+  });
+});
+
 describe("runUninstall", () => {
   it("removes agentboard from a specified client", async () => {
     const claudeConfigPath = join(tmpDir, ".claude.json");
