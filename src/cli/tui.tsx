@@ -21,7 +21,7 @@ export function buildDaemonSpawnArgs(agbHome: string): { execPath: string; args:
   const entryPath = join(dirname(fileURLToPath(import.meta.url)), "index.js");
   return {
     execPath: process.execPath,
-    args: [entryPath, "daemon", "--no-open", `--`],
+    args: [entryPath, "daemon", "--no-open"],
   };
 }
 

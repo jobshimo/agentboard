@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import {
   buildMenuItems,
   type TuiState,
@@ -7,6 +7,7 @@ import {
 } from "../tui-helpers.js";
 import type { DoctorReport } from "../doctor-report.js";
 import { buildDaemonSpawnArgs } from "../tui.js";
+import { parseArgv } from "../index.js";
 
 describe("buildMenuItems", () => {
   it("returns an array of menu items with labels and values", () => {
@@ -74,6 +75,35 @@ describe("buildDaemonSpawnArgs", () => {
   it("first arg is a path ending in index.js", () => {
     const { args } = buildDaemonSpawnArgs("/tmp/agb");
     expect(args[0]).toMatch(/index\.js$/);
+  });
+
+  it("does NOT contain '--' in the spawn args", () => {
+    const { args } = buildDaemonSpawnArgs("/tmp/agb");
+    expect(args).not.toContain("--");
+  });
+
+  it("second arg is 'daemon' (subcommand position)", () => {
+    const { args } = buildDaemonSpawnArgs("/tmp/agb");
+    // args[0] = entryPath, args[1] = subcommand
+    expect(args[1]).toBe("daemon");
+  });
+
+  it("args parse cleanly through parseArgv — command is 'daemon', no exit", () => {
+    // Suppress process.exit to detect if parseArgv would crash
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(
+      (_code?: string | number | null) => { throw new Error(`process.exit(${_code})`); },
+    );
+    vi.spyOn(process.stderr, "write").mockReturnValue(true);
+
+    const { execPath, args } = buildDaemonSpawnArgs("/tmp/agb");
+    // parseArgv expects [nodeBin, scriptPath, ...rest]
+    // execPath = nodeBin, args[0] = scriptPath, args.slice(1) = actual CLI args
+    const parsed = parseArgv([execPath, args[0]!, ...args.slice(1)]);
+
+    expect(parsed.command).toBe("daemon");
+    expect(exitSpy).not.toHaveBeenCalled();
+
+    vi.restoreAllMocks();
   });
 });
 
