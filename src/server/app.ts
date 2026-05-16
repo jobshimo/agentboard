@@ -81,7 +81,7 @@ const startedAt = Date.now();
 export function buildApp(opts: AppOpts): FastifyInstance & { broadcaster: BroadcastManager; waiters: WaiterRegistry; mcpActivation: ActivationState } {
   const app = Fastify({
     logger: opts.logger ?? false,
-  }) as FastifyInstance & { broadcaster: BroadcastManager; waiters: WaiterRegistry; mcpActivation: ActivationState };
+  }) as unknown as FastifyInstance & { broadcaster: BroadcastManager; waiters: WaiterRegistry; mcpActivation: ActivationState };
 
   const broadcaster = new BroadcastManager();
   const waiters = new WaiterRegistry();
@@ -241,10 +241,8 @@ export function buildApp(opts: AppOpts): FastifyInstance & { broadcaster: Broadc
   // Production: serve the built SPA at /. In dev (no dist/web/) this is a no-op
   // so vite dev:web stays the SPA host and the proxy hits the API/WS on this port.
   if (hasWebBundle()) {
-    app.register(fastifyStatic, {
-      root: getWebBundlePath(),
-      prefix: "/",
-    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    app.register(fastifyStatic, { root: getWebBundlePath(), prefix: "/" } as any);
   }
 
   // NOTE: MCP transport (registerMcpTransport / buildMcpServer) has been
