@@ -21,7 +21,7 @@ export class AppError extends Error {
     this.name = "AppError";
     this.code = code;
     this.statusCode = statusCode;
-    this.hint = hint;
+    if (hint !== undefined) this.hint = hint;
   }
 }
 
