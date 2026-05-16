@@ -9,11 +9,13 @@
 import { isAbsolute, join } from "node:path";
 import { existsSync } from "node:fs";
 import type { FastifyInstance } from "fastify";
+import type { SocketStream } from "@fastify/websocket";
+import "@fastify/websocket"; // side-effect import — activates module augmentation for RouteShorthandOptions
 import type { BroadcastManager } from "./broadcaster.js";
 import { normalizeRepoPath } from "../db/connection.js";
 
 export function registerWsRoute(app: FastifyInstance, broadcaster: BroadcastManager): void {
-  app.get("/ws", { websocket: true }, (connection, req) => {
+  app.get("/ws", { websocket: true }, (connection: SocketStream, req) => {
     const { socket } = connection;
 
     // Parse ?repo= from the upgrade URL
