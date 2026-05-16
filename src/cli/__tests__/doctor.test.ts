@@ -172,6 +172,29 @@ describe("formatDoctorReport", () => {
     // Spanish for not running
     expect(output).toContain("no corriendo");
   });
+
+  it("lang=es output differs from lang=en output (lang parameter is effective)", () => {
+    const report: DoctorReport = {
+      daemon: { running: false, pid: null, port: null, uptime: null },
+      clients: [],
+      registry: { knownRepos: 0, lastSeenAt: null },
+      version: { current: "0.1.0", updateStatus: "up-to-date" },
+      paths: {
+        agbHome: "/tmp/agentboard",
+        configYaml: "/tmp/agentboard/config.yaml",
+        configYamlExists: false,
+      },
+    };
+
+    const enOutput = formatDoctorReport(report, "en");
+    const esOutput = formatDoctorReport(report, "es");
+
+    // Spanish "not running" vs English "not running"
+    expect(esOutput).toContain("no corriendo");
+    expect(enOutput).toContain("not running");
+    // The two outputs must differ — proves lang routing is real
+    expect(esOutput).not.toBe(enOutput);
+  });
 });
 
 describe("doctor registered-outdated logic", () => {

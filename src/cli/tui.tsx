@@ -127,7 +127,7 @@ function App({ agbHome, initialLang }: AppProps): React.ReactElement {
           setLoading(true);
           try {
             const report = await buildDoctorReport({ agbHome });
-            showMessage(formatDoctorReport(report));
+            showMessage(formatDoctorReport(report, lang));
           } catch (e) {
             showMessage(`Error: ${e instanceof Error ? e.message : String(e)}`);
           } finally {
