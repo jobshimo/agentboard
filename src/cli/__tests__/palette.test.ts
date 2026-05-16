@@ -34,11 +34,11 @@ describe("palette — design tokens", () => {
     }
   });
 
-  it("NO_COLOR logic: c() returns undefined when noColor is true", () => {
+  it("NO_COLOR logic: c() returns empty string when noColor is true", () => {
     // The module evaluates noColor at load time from process.env.
     // We test the conditional logic directly without reloading the module.
     const noColor = true;
-    const c = (hex: string): string | undefined => (noColor ? undefined : hex);
+    const c = (hex: string): string => (noColor ? "" : hex);
 
     const values = [
       c("#58a6ff"), c("#3fb950"), c("#d29922"), c("#f85149"),
@@ -47,13 +47,13 @@ describe("palette — design tokens", () => {
     ];
 
     for (const value of values) {
-      expect(value).toBeUndefined();
+      expect(value).toBe("");
     }
   });
 
   it("NO_COLOR logic: c() returns the hex string when noColor is false", () => {
     const noColor = false;
-    const c = (hex: string): string | undefined => (noColor ? undefined : hex);
+    const c = (hex: string): string => (noColor ? "" : hex);
 
     expect(c("#58a6ff")).toBe("#58a6ff");
     expect(c("#3fb950")).toBe("#3fb950");

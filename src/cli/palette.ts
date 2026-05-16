@@ -20,8 +20,14 @@
 
 const noColor = Boolean(process.env["NO_COLOR"]);
 
-function c(hex: string): string | undefined {
-  return noColor ? undefined : hex;
+/**
+ * Returns the hex color when color output is enabled, or an empty string
+ * when NO_COLOR is set. Use via the `Ct` component in tui.tsx rather than
+ * passing directly to `<Text color>` — the Ct component only passes the
+ * color prop when it is non-empty, satisfying exactOptionalPropertyTypes.
+ */
+function c(hex: string): string {
+  return noColor ? "" : hex;
 }
 
 export const palette = {
@@ -48,3 +54,10 @@ export const palette = {
 } as const;
 
 export type PaletteKey = keyof typeof palette;
+
+/**
+ * Whether color output is active.
+ * Exposed so consumers can conditionally spread color props without
+ * reaching back into process.env.
+ */
+export const colorActive = !noColor;
