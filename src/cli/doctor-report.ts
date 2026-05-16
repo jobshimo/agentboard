@@ -9,7 +9,8 @@ import type { ClientId } from "../install/types.js";
 import { makeClaudeCodeInstaller } from "../install/adapters/claude-code.js";
 import { makeOpenCodeInstaller } from "../install/adapters/opencode.js";
 import { makeCopilotInstaller } from "../install/adapters/copilot.js";
-import { detectInstructionsBlock } from "../install/instructions.js";
+import { detectInstructionsBlock, BLOCK_VERSION } from "../install/instructions.js";
+import { t } from "../i18n/strings.js";
 import { getVersion } from "./version.js";
 
 // ──────────────────────────────────────────────────────────────────
@@ -128,7 +129,10 @@ export async function buildDoctorReport(opts: BuildDoctorReportOptions): Promise
       if (!detected.clientDetected) {
         mcp = "not-detected";
       } else if (detected.registered) {
-        mcp = "registered-current";
+        // Consider the registration outdated when the instructions block version
+        // is older than the current BLOCK_VERSION, or when the block is missing
+        // even though the client is registered (run `agentboard install` to fix).
+        mcp = instrStatus === "outdated" ? "registered-outdated" : "registered-current";
       } else {
         mcp = "not-registered";
       }
@@ -223,41 +227,57 @@ function err(text: string): string {
   return `${c.red}[err]${c.reset}  ${text}`;
 }
 
-export function formatDoctorReport(report: DoctorReport): string {
+/** Simple template substitution: replace `{key}` with the corresponding value. */
+function sub(template: string, vars: Record<string, string>): string {
+  return template.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? `{${k}}`);
+}
+
+export function formatDoctorReport(report: DoctorReport, lang: "en" | "es" = "en"): string {
   const lines: string[] = [];
 
-  lines.push(`${c.bold}agentboard doctor${c.reset}`);
+  lines.push(`${c.bold}${t("doctor.title", lang)}${c.reset}`);
   lines.push("");
 
   // ── Daemon ──────────────────────────────────────────────────────
-  lines.push(`${c.dim}── daemon ──────────────────────────────────${c.reset}`);
+  lines.push(`${c.dim}── ${t("doctor.section.daemon", lang)} ──────────────────────────────────${c.reset}`);
   if (report.daemon.running) {
-    lines.push(ok(`running  pid=${report.daemon.pid}  port=${report.daemon.port}  uptime=${report.daemon.uptime}s`));
+    lines.push(ok(sub(t("doctor.daemon.running", lang), {
+      pid: String(report.daemon.pid),
+      port: String(report.daemon.port),
+      uptime: String(report.daemon.uptime),
+    })));
   } else {
-    lines.push(warn("not running — run: agentboard daemon"));
+    lines.push(warn(t("doctor.daemon.not_running", lang)));
   }
   lines.push("");
 
   // ── Clients ─────────────────────────────────────────────────────
-  lines.push(`${c.dim}── clients ─────────────────────────────────${c.reset}`);
+  lines.push(`${c.dim}── ${t("doctor.section.clients", lang)} ─────────────────────────────────${c.reset}`);
   for (const client of report.clients) {
     const mcpLine = (() => {
       switch (client.mcp) {
-        case "registered-current":  return ok(`${client.displayName}  mcp: registered`);
-        case "registered-outdated": return warn(`${client.displayName}  mcp: outdated — run: agentboard install`);
-        case "not-registered":      return warn(`${client.displayName}  mcp: not registered — run: agentboard install --client ${client.id}`);
-        case "not-detected":        return `${c.dim}[--]${c.reset}  ${client.displayName}  not detected`;
+        case "registered-current":
+          return ok(sub(t("doctor.mcp.registered", lang), { name: client.displayName }));
+        case "registered-outdated":
+          return warn(sub(t("doctor.mcp.outdated", lang), { name: client.displayName }));
+        case "not-registered":
+          return warn(sub(t("doctor.mcp.not_registered", lang), { name: client.displayName, id: client.id }));
+        case "not-detected":
+          return `${c.dim}[--]${c.reset}  ${sub(t("doctor.mcp.not_detected", lang), { name: client.displayName })}`;
       }
     })();
     lines.push(mcpLine);
 
     const instrLine = (() => {
       switch (client.instructions) {
-        case "current":  return ok(`${client.displayName}  instructions: current`);
-        case "outdated": return warn(`${client.displayName}  instructions: outdated`);
-        case "missing":  return client.mcp === "not-detected"
-          ? `${c.dim}[--]${c.reset}  ${client.displayName}  instructions: n/a`
-          : warn(`${client.displayName}  instructions: missing — run: agentboard install --client ${client.id}`);
+        case "current":
+          return ok(sub(t("doctor.instr.current", lang), { name: client.displayName }));
+        case "outdated":
+          return warn(sub(t("doctor.instr.outdated", lang), { name: client.displayName }));
+        case "missing":
+          return client.mcp === "not-detected"
+            ? `${c.dim}[--]${c.reset}  ${sub(t("doctor.instr.na", lang), { name: client.displayName })}`
+            : warn(sub(t("doctor.instr.missing", lang), { name: client.displayName, id: client.id }));
       }
     })();
     lines.push(instrLine);
@@ -265,28 +285,31 @@ export function formatDoctorReport(report: DoctorReport): string {
   lines.push("");
 
   // ── Registry ────────────────────────────────────────────────────
-  lines.push(`${c.dim}── registry ────────────────────────────────${c.reset}`);
-  lines.push(ok(`known repos: ${report.registry.knownRepos}  last-seen: ${report.registry.lastSeenAt ?? "n/a"}`));
+  lines.push(`${c.dim}── ${t("doctor.section.registry", lang)} ────────────────────────────────${c.reset}`);
+  lines.push(ok(sub(t("doctor.registry.summary", lang), {
+    repos: String(report.registry.knownRepos),
+    lastSeen: report.registry.lastSeenAt ?? "n/a",
+  })));
   lines.push("");
 
   // ── Version ─────────────────────────────────────────────────────
-  lines.push(`${c.dim}── version ─────────────────────────────────${c.reset}`);
-  lines.push(ok(`current: v${report.version.current}`));
+  lines.push(`${c.dim}── ${t("doctor.section.version", lang)} ─────────────────────────────────${c.reset}`);
+  lines.push(ok(sub(t("doctor.version.current", lang), { version: report.version.current })));
   if (report.version.updateStatus === "newer") {
-    lines.push(warn(`newer available: v${report.version.latest} — run: npm i -g @jobshimo/agentboard`));
+    lines.push(warn(sub(t("doctor.version.newer", lang), { latest: report.version.latest ?? "?" })));
   } else if (report.version.updateStatus === "up-to-date") {
-    lines.push(ok("up to date"));
+    lines.push(ok(t("doctor.version.up_to_date", lang)));
   } else {
-    lines.push(warn("update check failed (offline?)"));
+    lines.push(warn(t("doctor.version.unknown", lang)));
   }
   lines.push("");
 
   // ── Paths ───────────────────────────────────────────────────────
-  lines.push(`${c.dim}── paths ───────────────────────────────────${c.reset}`);
-  lines.push(ok(`agb-home:   ${report.paths.agbHome}`));
+  lines.push(`${c.dim}── ${t("doctor.section.paths", lang)} ───────────────────────────────────${c.reset}`);
+  lines.push(ok(sub(t("doctor.paths.agb_home", lang), { path: report.paths.agbHome })));
   const cfgLine = report.paths.configYamlExists
-    ? ok(`config.yaml: ${report.paths.configYaml}`)
-    : warn(`config.yaml: ${report.paths.configYaml}  (not found — defaults apply)`);
+    ? ok(sub(t("doctor.paths.config_found", lang), { path: report.paths.configYaml }))
+    : warn(sub(t("doctor.paths.config_missing", lang), { path: report.paths.configYaml }));
   lines.push(cfgLine);
   lines.push("");
 

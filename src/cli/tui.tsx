@@ -5,7 +5,7 @@
 import React, { useState, useCallback } from "react";
 import { render, Box, Text, useApp, useInput } from "ink";
 import SelectInput from "ink-select-input";
-import { spawn } from "node:child_process";
+import { spawn, exec } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildMenuItems, toggleLanguage, type TuiState } from "./tui-helpers.js";
@@ -176,7 +176,7 @@ function App({ agbHome, initialLang }: AppProps): React.ReactElement {
     return (
       <Box flexDirection="column">
         <Text>{message}</Text>
-        <Text dimColor>Press any key to return to the menu.</Text>
+        <Text dimColor>{t("tui.press_any_key", lang)}</Text>
       </Box>
     );
   }
@@ -186,7 +186,7 @@ function App({ agbHome, initialLang }: AppProps): React.ReactElement {
       <Box flexDirection="column">
         <Text bold>{t("tui.projects_header", lang)}</Text>
         <Text dimColor>{t("tui.no_projects", lang)}</Text>
-        <Text dimColor>Press Esc or q to return.</Text>
+        <Text dimColor>{t("tui.press_esc", lang)}</Text>
       </Box>
     );
   }
@@ -270,7 +270,7 @@ function App({ agbHome, initialLang }: AppProps): React.ReactElement {
       </Box>
       <SelectInput items={menuItems} onSelect={handleMenuSelect} />
       <Box marginTop={1}>
-        <Text dimColor>l = toggle language  q = quit</Text>
+        <Text dimColor>{t("tui.hotkeys", lang)}</Text>
       </Box>
     </Box>
   );

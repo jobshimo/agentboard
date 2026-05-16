@@ -13,6 +13,7 @@ import {
 } from "../install/instructions.js";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { t } from "../i18n/strings.js";
 import { printLine } from "./output.js";
 
 /** Map a client id to the path of its global instructions file. */
@@ -51,11 +52,13 @@ export interface InstallCmdOptions {
   adapterOverrides?: AdapterOverrides;
   /** Override instructions file paths per client (for testing). */
   instructionsOverrides?: InstructionsOverrides;
+  /** Language for user-facing messages. Defaults to "en". */
+  lang?: "en" | "es";
 }
 
 /** Run `agentboard install [--client <id>] [--dry-run]`. */
 export async function runInstall(opts: InstallCmdOptions): Promise<void> {
-  const { clientId, dryRun, adapterOverrides = {}, instructionsOverrides = {} } = opts;
+  const { clientId, dryRun, adapterOverrides = {}, instructionsOverrides = {}, lang = "en" } = opts;
   const installOpts: InstallOptions = { dryRun };
 
   const resolveInstrPath = (id: ClientId): string =>
@@ -105,7 +108,7 @@ export async function runInstall(opts: InstallCmdOptions): Promise<void> {
   }
 
   if (!installedAny) {
-    printLine("No supported MCP clients detected. Install Claude Code, OpenCode, or GitHub Copilot first.");
+    printLine(t("install.no_clients_detected", lang));
   }
 }
 
@@ -115,11 +118,13 @@ export interface UninstallCmdOptions {
   adapterOverrides?: AdapterOverrides;
   /** Override instructions file paths per client (for testing). */
   instructionsOverrides?: InstructionsOverrides;
+  /** Language for user-facing messages. Defaults to "en". */
+  lang?: "en" | "es";
 }
 
 /** Run `agentboard uninstall [--client <id>] [--dry-run]`. */
 export async function runUninstall(opts: UninstallCmdOptions): Promise<void> {
-  const { clientId, dryRun, adapterOverrides = {}, instructionsOverrides = {} } = opts;
+  const { clientId, dryRun, adapterOverrides = {}, instructionsOverrides = {}, lang = "en" } = opts;
   const installOpts: InstallOptions = { dryRun };
 
   const resolveInstrPath = (id: ClientId): string =>
@@ -163,6 +168,6 @@ export async function runUninstall(opts: UninstallCmdOptions): Promise<void> {
   }
 
   if (!removedAny) {
-    printLine("agentboard was not registered in any supported MCP client.");
+    printLine(t("uninstall.not_registered", lang));
   }
 }

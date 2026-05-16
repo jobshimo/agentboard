@@ -25,6 +25,9 @@ export const en = {
   "tui.opening_browser": "Opening browser…",
   "tui.no_projects": "No projects yet — open a repo with the agent or run `agentboard daemon` from a project root.",
   "tui.projects_header": "Known projects:",
+  "tui.press_any_key": "Press any key to return to the menu.",
+  "tui.press_esc": "Press Esc or q to return.",
+  "tui.hotkeys": "l = toggle language  q = quit",
 
   // Install sub-menu
   "install.menu.title": "Install MCP — select client",
@@ -36,12 +39,14 @@ export const en = {
   "install.success": "Installed: {client}",
   "install.already": "Already installed: {client}",
   "install.dry_run": "[dry-run] would install: {client} → {file}",
+  "install.no_clients_detected": "No supported MCP clients detected. Install Claude Code, OpenCode, or GitHub Copilot first.",
 
   // Uninstall sub-menu
   "uninstall.menu.title": "Uninstall MCP — select client",
   "uninstall.success": "Uninstalled: {client}",
   "uninstall.not_present": "Not installed: {client}",
   "uninstall.dry_run": "[dry-run] would uninstall: {client} → {file}",
+  "uninstall.not_registered": "agentboard was not registered in any supported MCP client.",
 
   // Doctor
   "doctor.title": "agentboard doctor",
@@ -53,6 +58,24 @@ export const en = {
   "doctor.ok": "[ok]",
   "doctor.warn": "[warn]",
   "doctor.err": "[err]",
+  "doctor.daemon.running": "running  pid={pid}  port={port}  uptime={uptime}s",
+  "doctor.daemon.not_running": "not running — run: agentboard daemon",
+  "doctor.mcp.registered": "{name}  mcp: registered",
+  "doctor.mcp.outdated": "{name}  mcp: outdated — run: agentboard install",
+  "doctor.mcp.not_registered": "{name}  mcp: not registered — run: agentboard install --client {id}",
+  "doctor.mcp.not_detected": "{name}  not detected",
+  "doctor.instr.current": "{name}  instructions: current",
+  "doctor.instr.outdated": "{name}  instructions: outdated",
+  "doctor.instr.missing": "{name}  instructions: missing — run: agentboard install --client {id}",
+  "doctor.instr.na": "{name}  instructions: n/a",
+  "doctor.registry.summary": "known repos: {repos}  last-seen: {lastSeen}",
+  "doctor.version.current": "current: v{version}",
+  "doctor.version.newer": "newer available: v{latest} — run: npm i -g @jobshimo/agentboard",
+  "doctor.version.up_to_date": "up to date",
+  "doctor.version.unknown": "update check failed (offline?)",
+  "doctor.paths.agb_home": "agb-home:   {path}",
+  "doctor.paths.config_found": "config.yaml: {path}",
+  "doctor.paths.config_missing": "config.yaml: {path}  (not found — defaults apply)",
 
   // Update check
   "update.checking": "Checking for updates…",
@@ -87,6 +110,9 @@ export const es: Record<StringKey, string> = {
   "tui.opening_browser": "Abriendo navegador…",
   "tui.no_projects": "Sin proyectos aún — abrí un repo con el agente o ejecutá `agentboard daemon` desde la raíz del proyecto.",
   "tui.projects_header": "Proyectos conocidos:",
+  "tui.press_any_key": "Presioná cualquier tecla para volver al menú.",
+  "tui.press_esc": "Presioná Esc o q para volver.",
+  "tui.hotkeys": "l = cambiar idioma  q = salir",
 
   // Install sub-menu
   "install.menu.title": "Instalar MCP — seleccioná cliente",
@@ -98,12 +124,14 @@ export const es: Record<StringKey, string> = {
   "install.success": "Instalado: {client}",
   "install.already": "Ya instalado: {client}",
   "install.dry_run": "[dry-run] instalaría: {client} → {file}",
+  "install.no_clients_detected": "No se detectaron clientes MCP. Instalá Claude Code, OpenCode o GitHub Copilot primero.",
 
   // Uninstall sub-menu
   "uninstall.menu.title": "Desinstalar MCP — seleccioná cliente",
   "uninstall.success": "Desinstalado: {client}",
   "uninstall.not_present": "No instalado: {client}",
   "uninstall.dry_run": "[dry-run] desinstalaría: {client} → {file}",
+  "uninstall.not_registered": "agentboard no estaba registrado en ningún cliente MCP.",
 
   // Doctor
   "doctor.title": "agentboard doctor",
@@ -115,6 +143,24 @@ export const es: Record<StringKey, string> = {
   "doctor.ok": "[ok]",
   "doctor.warn": "[warn]",
   "doctor.err": "[err]",
+  "doctor.daemon.running": "corriendo  pid={pid}  puerto={port}  uptime={uptime}s",
+  "doctor.daemon.not_running": "no corriendo — ejecutá: agentboard daemon",
+  "doctor.mcp.registered": "{name}  mcp: registrado",
+  "doctor.mcp.outdated": "{name}  mcp: desactualizado — ejecutá: agentboard install",
+  "doctor.mcp.not_registered": "{name}  mcp: no registrado — ejecutá: agentboard install --client {id}",
+  "doctor.mcp.not_detected": "{name}  no detectado",
+  "doctor.instr.current": "{name}  instrucciones: al día",
+  "doctor.instr.outdated": "{name}  instrucciones: desactualizadas",
+  "doctor.instr.missing": "{name}  instrucciones: faltan — ejecutá: agentboard install --client {id}",
+  "doctor.instr.na": "{name}  instrucciones: n/a",
+  "doctor.registry.summary": "repos conocidos: {repos}  última vez: {lastSeen}",
+  "doctor.version.current": "actual: v{version}",
+  "doctor.version.newer": "nueva versión disponible: v{latest} — ejecutá: npm i -g @jobshimo/agentboard",
+  "doctor.version.up_to_date": "al día",
+  "doctor.version.unknown": "no se pudo verificar actualizaciones (¿sin conexión?)",
+  "doctor.paths.agb_home": "agb-home:   {path}",
+  "doctor.paths.config_found": "config.yaml: {path}",
+  "doctor.paths.config_missing": "config.yaml: {path}  (no encontrado — se usan valores por defecto)",
 
   // Update check
   "update.checking": "Buscando actualizaciones…",
