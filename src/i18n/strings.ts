@@ -99,6 +99,70 @@ export const en = {
   // Language toggle
   "language.current": "Language: English",
   "language.switched": "Language changed. Restart not required.",
+
+  // TUI v2 — Menu sections
+  "tui.section.server": "SERVER",
+  "tui.section.client": "CLIENT",
+  "tui.section.diagnose": "DIAGNOSE",
+  "tui.section.reference": "REFERENCE",
+
+  // TUI v2 — Menu screen title and prompt
+  "tui.menu.title": "agentboard",
+  "tui.menu.prompt": "Pick an action",
+  "tui.menu.prompt_hint": "or press the bracketed key",
+
+  // TUI v2 — Menu item hints
+  "tui.hint.start_daemon": "probe and spawn :7733",
+  "tui.hint.open_web_ui": "http://localhost:7733",
+  "tui.hint.list_projects": "repos tracked by the daemon",
+  "tui.hint.install_mcp": "Claude Code, OpenCode, Copilot",
+  "tui.hint.uninstall": "remove MCP config entries",
+  "tui.hint.doctor": "report current setup state",
+  "tui.hint.update_check": "check npm for a newer version",
+  "tui.hint.language_toggle": "EN / ES",
+  "tui.hint.quit": "",
+
+  // TUI v2 — Footer labels (menu screen)
+  "tui.footer.navigate": "navigate",
+  "tui.footer.select": "select",
+  "tui.footer.hotkey": "hotkey",
+  "tui.footer.lang": "lang",
+  "tui.footer.quit": "quit",
+  "tui.footer.back": "back",
+
+  // TUI v2 — Install screen
+  "tui.install.title": "Install MCP in clients",
+  "tui.install.prompt": "Select a client",
+  "tui.install.running": "Installing…",
+  "tui.install.done": "Done. Press Esc to return.",
+
+  // TUI v2 — Uninstall screen
+  "tui.uninstall.title": "Uninstall MCP from clients",
+  "tui.uninstall.prompt": "Select a client",
+  "tui.uninstall.running": "Uninstalling…",
+  "tui.uninstall.done": "Done. Press Esc to return.",
+
+  // TUI v2 — Projects screen
+  "tui.projects.title": "Known projects",
+  "tui.projects.empty": "No projects yet.",
+  "tui.projects.empty_hint": "Open a repo with the agent or run `agentboard daemon` from a project root.",
+
+  // TUI v2 — Doctor screen
+  "tui.doctor.title": "Doctor",
+  "tui.doctor.running": "Running diagnostics…",
+
+  // TUI v2 — Update screen
+  "tui.update.title": "Update check",
+  "tui.update.running": "Checking npm…",
+  "tui.update.up_to_date": "You are up to date.",
+  "tui.update.newer": "Newer version available: {latest}",
+  "tui.update.install_cmd": "Run: npm install -g @jobshimo/agentboard@latest",
+  "tui.update.error": "Could not reach npm (offline?).",
+
+  // TUI v2 — Action feedback
+  "tui.action.daemon_started": "Daemon started (PID {pid}). Returning to menu…",
+  "tui.action.daemon_spawn_error": "Failed to start daemon: {error}",
+  "tui.action.browser_opening": "Opening http://localhost:7733 in your browser…",
 } as const;
 
 export type StringKey = keyof typeof en;
@@ -197,6 +261,70 @@ export const es: Record<StringKey, string> = {
   // Language toggle
   "language.current": "Idioma: Español",
   "language.switched": "Idioma cambiado. No es necesario reiniciar.",
+
+  // TUI v2 — Menu sections
+  "tui.section.server": "SERVIDOR",
+  "tui.section.client": "CLIENTE",
+  "tui.section.diagnose": "DIAGNÓSTICO",
+  "tui.section.reference": "REFERENCIA",
+
+  // TUI v2 — Menu screen title and prompt
+  "tui.menu.title": "agentboard",
+  "tui.menu.prompt": "Elegí una acción",
+  "tui.menu.prompt_hint": "o apretá la letra entre corchetes",
+
+  // TUI v2 — Menu item hints
+  "tui.hint.start_daemon": "probar y arrancar :7733",
+  "tui.hint.open_web_ui": "http://localhost:7733",
+  "tui.hint.list_projects": "repos rastreados por el daemon",
+  "tui.hint.install_mcp": "Claude Code, OpenCode, Copilot",
+  "tui.hint.uninstall": "eliminar entradas de configuración MCP",
+  "tui.hint.doctor": "estado actual del setup",
+  "tui.hint.update_check": "buscar nueva versión en npm",
+  "tui.hint.language_toggle": "EN / ES",
+  "tui.hint.quit": "",
+
+  // TUI v2 — Footer labels (menu screen)
+  "tui.footer.navigate": "moverse",
+  "tui.footer.select": "elegir",
+  "tui.footer.hotkey": "hotkey",
+  "tui.footer.lang": "idioma",
+  "tui.footer.quit": "salir",
+  "tui.footer.back": "volver",
+
+  // TUI v2 — Install screen
+  "tui.install.title": "Instalar MCP en clientes",
+  "tui.install.prompt": "Seleccioná un cliente",
+  "tui.install.running": "Instalando…",
+  "tui.install.done": "Listo. Presioná Esc para volver.",
+
+  // TUI v2 — Uninstall screen
+  "tui.uninstall.title": "Desinstalar MCP de clientes",
+  "tui.uninstall.prompt": "Seleccioná un cliente",
+  "tui.uninstall.running": "Desinstalando…",
+  "tui.uninstall.done": "Listo. Presioná Esc para volver.",
+
+  // TUI v2 — Projects screen
+  "tui.projects.title": "Proyectos conocidos",
+  "tui.projects.empty": "Sin proyectos aún.",
+  "tui.projects.empty_hint": "Abrí un repo con el agente o ejecutá `agentboard daemon` desde la raíz del proyecto.",
+
+  // TUI v2 — Doctor screen
+  "tui.doctor.title": "Doctor",
+  "tui.doctor.running": "Ejecutando diagnósticos…",
+
+  // TUI v2 — Update screen
+  "tui.update.title": "Buscar actualizaciones",
+  "tui.update.running": "Consultando npm…",
+  "tui.update.up_to_date": "Estás al día.",
+  "tui.update.newer": "Nueva versión disponible: {latest}",
+  "tui.update.install_cmd": "Ejecutá: npm install -g @jobshimo/agentboard@latest",
+  "tui.update.error": "No se pudo llegar a npm (¿sin conexión?).",
+
+  // TUI v2 — Action feedback
+  "tui.action.daemon_started": "Daemon iniciado (PID {pid}). Volviendo al menú…",
+  "tui.action.daemon_spawn_error": "Error al iniciar daemon: {error}",
+  "tui.action.browser_opening": "Abriendo http://localhost:7733 en el navegador…",
 } as const;
 
 /**
